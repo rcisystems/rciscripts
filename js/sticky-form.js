@@ -19,28 +19,31 @@ document.addEventListener("DOMContentLoaded", function () {
     var navbarOffset = navbar.offsetTop;
     var navbarHeight = navbar.offsetHeight;
     var formHeight = stickyElement.offsetHeight;
-    var stopPosition = navbarOffset + navbarHeight - formHeight; // Stop point for sticky element
+    var sectionBottom = navbarOffset + navbar.offsetHeight; // Bottom position of the navbar section
 
     console.log("📌 Navbar offset top:", navbarOffset);
     console.log("📌 Navbar height:", navbarHeight);
     console.log("📌 Form height:", formHeight);
-    console.log("📌 Stop position for sticky form:", stopPosition);
+    console.log("📌 Section bottom:", sectionBottom);
 
     window.addEventListener("scroll", function () {
-        var scrollPosition = window.scrollY; // ✅ Future-proof (replaces pageYOffset)
+        var scrollPosition = window.scrollY; // ✅ Use scrollY (replaces pageYOffset)
         console.log("🔄 Window scroll position:", scrollPosition);
 
-        if (scrollPosition >= (navbarOffset + navbarHeight)) {
-            if (scrollPosition <= stopPosition) {
-                // Stick to top
+        var formBottomPosition = scrollPosition + navbarHeight + formHeight;
+
+        if (scrollPosition >= navbarOffset + navbarHeight) {
+            if (formBottomPosition <= sectionBottom) {
+                // Stick the form under the navbar
                 stickyElement.classList.add("sticky");
+                stickyElement.style.position = "fixed";
                 stickyElement.style.top = navbarHeight + "px";
                 console.log("✅ Sticky class added.");
             } else {
                 // Stop moving when reaching the bottom of the section
                 stickyElement.classList.remove("sticky");
                 stickyElement.style.position = "absolute";
-                stickyElement.style.top = (stopPosition - navbarOffset) + "px";
+                stickyElement.style.top = (sectionBottom - formHeight) + "px";
                 console.log("🛑 Sticky element stopped at bottom.");
             }
         } else {
