@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", function () {
-    console.log("DOM fully loaded and parsed.");
+    console.log("✅ DOM fully loaded and parsed.");
 
     var stickyElement = document.getElementById("form-pibcjgcQpF");
     var navbar = document.getElementById("section-rjLfyckuu");
@@ -22,13 +22,13 @@ document.addEventListener("DOMContentLoaded", function () {
     console.log("📌 Navbar height:", navbarHeight);
 
     window.addEventListener("scroll", function () {
-        var scrollPosition = window.pageYOffset;
+        var scrollPosition = window.scrollY; // ✅ Replacing pageYOffset with scrollY
         console.log("🔄 Window scroll position:", scrollPosition);
 
-        if (scrollPosition >= navbarOffset + navbarHeight) {
+        if (scrollPosition >= (navbarOffset + navbarHeight)) {
             if (!stickyElement.classList.contains("sticky")) {
                 stickyElement.classList.add("sticky");
-                stickyElement.style.top = navbarHeight + "px"; // Prevent overlap
+                stickyElement.style.top = navbarHeight + "px"; // Ensures it stays below the navbar
                 console.log("✅ Sticky class added.");
             }
         } else {
