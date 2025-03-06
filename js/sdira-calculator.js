@@ -150,8 +150,9 @@ function calculateRetirement() {
     );
     renderCharts(data);
 
-    // Make "Save Scenario" button visible after first calculation
+    // Make "Save Scenario" button and Scenario Comparison Table visible
     document.getElementById("save-scenario").style.display = "block";
+    document.getElementById("scenario-comparison-container").style.display = "block";
 
     // Add recalculate button if the plan is unsustainable
     const recalculateButton = document.getElementById("recalculate-button");
