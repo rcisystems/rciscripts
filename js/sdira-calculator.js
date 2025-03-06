@@ -113,21 +113,21 @@ function calculateRetirement() {
 
       // Update the table
       scheduleTable.innerHTML += `
-                <tr class="${rowClass}">
-                    <td>${age}</td>
-                    <td>${
-                      isRetired && annualWithdrawal > 0
-                        ? "0"
-                        : yearlyIncome.toLocaleString()
-                    }</td>
-                    <td>${Math.max(0, beginningBalance).toLocaleString()}</td>
-                    <td>${Math.max(0, earnings).toLocaleString()}</td>
-                    <td>${annualSavings.toLocaleString()}</td>
-                    <td>${annualWithdrawal.toLocaleString()}</td>
-                    <td>${Math.max(0, balance).toLocaleString()}</td>
-                    <td>${withdrawalRate.toFixed(2)}%</td>
-                </tr>
-            `;
+          <tr class="${rowClass}">
+              <td>${age}</td>
+              <td>${
+                isRetired && annualWithdrawal > 0
+                  ? "0"
+                  : yearlyIncome.toLocaleString()
+              }</td>
+              <td>${Math.max(0, beginningBalance).toLocaleString()}</td>
+              <td>${Math.max(0, earnings).toLocaleString()}</td>
+              <td>${annualSavings.toLocaleString()}</td>
+              <td>${annualWithdrawal.toLocaleString()}</td>
+              <td>${Math.max(0, balance).toLocaleString()}</td>
+              <td>${withdrawalRate.toFixed(2)}%</td>
+          </tr>
+      `;
     }
 
     let recommendedAge = inputs.retirementAge;
@@ -150,6 +150,9 @@ function calculateRetirement() {
     );
     renderCharts(data);
 
+    // Make "Save Scenario" button visible after first calculation
+    document.getElementById("save-scenario").style.display = "block";
+
     // Add recalculate button if the plan is unsustainable
     const recalculateButton = document.getElementById("recalculate-button");
     recalculateButton.innerHTML = ""; // Clear existing button
@@ -170,6 +173,7 @@ function calculateRetirement() {
     if (pdfContainer) {
       pdfContainer.innerHTML = "";
     }
+    
 
     console.error(
       "An error occurred during retirement calculation:",
@@ -379,6 +383,105 @@ function updateSummary(
           <p><strong>After Retirement Income:</strong> $${inputs.afterRetIncome.toLocaleString()}</p>
       `;
   }
+
+  // Array to store saved scenarios
+let savedScenarios = [];
+
+// Function to save scenario
+function saveScenario() {
+    try {
+        // Get input values
+        const inputs = getInputs();
+        validateInputs(inputs);
+
+        // Calculate the scenario
+        let balance = inputs.currentBalance;
+        let runOutOfMoneyAge = null;
+        let totalAmountNeeded = 0;
+        let isSelfSustaining = true;
+
+        const initialWithdrawal = inputs.desiredIncome * Math.pow(1 + inputs.costInflation, inputs.retirementAge - inputs.currentAge);
+
+        for (let age = inputs.currentAge; age <= inputs.lifeExpectancy; age++) {
+            const isRetired = age >= inputs.retirementAge;
+            const annualWithdrawal = isRetired ? Math.max(0, initialWithdrawal - inputs.afterRetIncome) * Math.pow(1 + inputs.costInflation, age - inputs.retirementAge) : 0;
+
+            balance = balance + (balance * (isRetired ? inputs.postRetReturn : inputs.preRetReturn)) - annualWithdrawal;
+
+            if (isRetired) {
+                totalAmountNeeded += Math.ceil(annualWithdrawal);
+            }
+
+            if (balance < 0 && runOutOfMoneyAge === null) {
+                runOutOfMoneyAge = age;
+                isSelfSustaining = false;
+            }
+        }
+
+        // Store scenario
+        const scenario = {
+            id: Date.now(),
+            retirementAge: inputs.retirementAge,
+            afterRetIncome: inputs.afterRetIncome,
+            desiredIncome: inputs.desiredIncome,
+            runOutOfMoneyAge: runOutOfMoneyAge || "Never",
+            totalNeeded: totalAmountNeeded
+        };
+
+        savedScenarios.push(scenario);
+        updateScenarioTable();
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+}
+
+// Function to update the scenario comparison table
+function updateScenarioTable() {
+    const table = document.getElementById("scenario-comparison");
+
+    // Clear existing rows except for headers
+    table.innerHTML = `
+        <tr>
+            <th>Scenario</th>
+            <th>Retirement Age</th>
+            <th>After Retirement Income</th>
+            <th>Yearly Desired Income</th>
+            <th>Run Out of Money Age</th>
+            <th>Total Needed</th>
+            <th>Delete</th>
+        </tr>
+    `;
+
+    // Add saved scenarios
+    savedScenarios.forEach((scenario, index) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+            <td>Scenario ${index + 1}</td>
+            <td>${scenario.retirementAge}</td>
+            <td>$${scenario.afterRetIncome.toLocaleString()}</td>
+            <td>$${scenario.desiredIncome.toLocaleString()}</td>
+            <td>${scenario.runOutOfMoneyAge}</td>
+            <td>$${scenario.totalNeeded.toLocaleString()}</td>
+            <td><button class="delete-btn" data-id="${scenario.id}">🗑</button></td>
+        `;
+        table.appendChild(row);
+    });
+
+    // Add delete event listeners
+    document.querySelectorAll(".delete-btn").forEach(button => {
+        button.addEventListener("click", deleteScenario);
+    });
+}
+
+// Function to delete a scenario
+function deleteScenario(event) {
+    const id = parseInt(event.target.getAttribute("data-id"));
+    savedScenarios = savedScenarios.filter(scenario => scenario.id !== id);
+    updateScenarioTable();
+}
+
+// Event listener for "Save Scenario" button
+document.getElementById("save-scenario").addEventListener("click", saveScenario);
 
 function renderCharts(data) {
   const ages = data.map((row) => row.age);
@@ -692,6 +795,8 @@ function downloadPDF() {
   // Save the PDF
   doc.save("retirement_calculation_results.pdf");
 }
+
+
 
 // Initialize the calculator when the document is ready
 document.addEventListener("DOMContentLoaded", () => {
