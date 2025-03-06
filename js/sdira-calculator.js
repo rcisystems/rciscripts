@@ -466,6 +466,9 @@ function updateScenarioTable() {
       return;
   }
 
+  // Ensure the table is visible
+  document.getElementById("scenario-comparison-container").style.display = "block";
+
   // Clear existing rows except for headers
   table.innerHTML = `
       <tr>
