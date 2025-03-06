@@ -13,7 +13,10 @@ function calculateRetirement() {
 
     // Gather inputs
     const inputs = getInputs();
+    console.log("User Inputs:", inputs);
+
     validateInputs(inputs);
+    console.log("Inputs validated successfully");
 
     let balance = inputs.currentBalance;
     let runOutOfMoneyAge = null;
@@ -390,89 +393,121 @@ let savedScenarios = [];
 
 // Function to save scenario
 function saveScenario() {
-    try {
-        // Get input values
-        const inputs = getInputs();
-        validateInputs(inputs);
+  try {
+      console.log("Saving scenario...");
 
-        // Calculate the scenario
-        let balance = inputs.currentBalance;
-        let runOutOfMoneyAge = null;
-        let totalAmountNeeded = 0;
-        let isSelfSustaining = true;
+      // Get input values
+      const inputs = getInputs();
+      console.log("User Inputs:", inputs);
 
-        const initialWithdrawal = inputs.desiredIncome * Math.pow(1 + inputs.costInflation, inputs.retirementAge - inputs.currentAge);
+      validateInputs(inputs);
+      console.log("Inputs validated successfully");
 
-        for (let age = inputs.currentAge; age <= inputs.lifeExpectancy; age++) {
-            const isRetired = age >= inputs.retirementAge;
-            const annualWithdrawal = isRetired ? Math.max(0, initialWithdrawal - inputs.afterRetIncome) * Math.pow(1 + inputs.costInflation, age - inputs.retirementAge) : 0;
+      // Calculate the scenario
+      let balance = inputs.currentBalance;
+      let runOutOfMoneyAge = null;
+      let totalAmountNeeded = 0;
+      let isSelfSustaining = true;
 
-            balance = balance + (balance * (isRetired ? inputs.postRetReturn : inputs.preRetReturn)) - annualWithdrawal;
+      const initialWithdrawal = inputs.desiredIncome * Math.pow(1 + inputs.costInflation, inputs.retirementAge - inputs.currentAge);
+      console.log("Initial Withdrawal:", initialWithdrawal);
 
-            if (isRetired) {
-                totalAmountNeeded += Math.ceil(annualWithdrawal);
-            }
+      for (let age = inputs.currentAge; age <= inputs.lifeExpectancy; age++) {
+          const isRetired = age >= inputs.retirementAge;
+          const annualWithdrawal = isRetired 
+              ? Math.max(0, initialWithdrawal - inputs.afterRetIncome) * Math.pow(1 + inputs.costInflation, age - inputs.retirementAge) 
+              : 0;
 
-            if (balance < 0 && runOutOfMoneyAge === null) {
-                runOutOfMoneyAge = age;
-                isSelfSustaining = false;
-            }
-        }
+          balance = balance + (balance * (isRetired ? inputs.postRetReturn : inputs.preRetReturn)) - annualWithdrawal;
 
-        // Store scenario
-        const scenario = {
-            id: Date.now(),
-            retirementAge: inputs.retirementAge,
-            afterRetIncome: inputs.afterRetIncome,
-            desiredIncome: inputs.desiredIncome,
-            runOutOfMoneyAge: runOutOfMoneyAge || "Never",
-            totalNeeded: totalAmountNeeded
-        };
+          console.log(`Age: ${age}, Balance: ${balance}, Annual Withdrawal: ${annualWithdrawal}`);
 
-        savedScenarios.push(scenario);
-        updateScenarioTable();
-    } catch (error) {
-        alert(`Error: ${error.message}`);
-    }
+          if (isRetired) {
+              totalAmountNeeded += Math.ceil(annualWithdrawal);
+          }
+
+          if (balance < 0 && runOutOfMoneyAge === null) {
+              runOutOfMoneyAge = age;
+              isSelfSustaining = false;
+              console.warn(`Funds run out at Age ${age}`);
+          }
+      }
+
+      // Store scenario
+      const scenario = {
+          id: Date.now(),
+          retirementAge: inputs.retirementAge,
+          afterRetIncome: inputs.afterRetIncome,
+          desiredIncome: inputs.desiredIncome,
+          runOutOfMoneyAge: runOutOfMoneyAge || "Never",
+          totalNeeded: totalAmountNeeded
+      };
+
+      savedScenarios.push(scenario);
+      console.log("Scenario saved:", scenario);
+
+      updateScenarioTable();
+  } catch (error) {
+      console.error("Error in saveScenario():", error);
+      alert(`Error: ${error.message}`);
+  }
 }
+
 
 // Function to update the scenario comparison table
 function updateScenarioTable() {
-    const table = document.getElementById("scenario-comparison");
+  console.log("Updating Scenario Table...");
+  console.log("Saved Scenarios:", savedScenarios);
 
-    // Clear existing rows except for headers
-    table.innerHTML = `
-        <tr>
-            <th>Scenario</th>
-            <th>Retirement Age</th>
-            <th>After Retirement Income</th>
-            <th>Yearly Desired Income</th>
-            <th>Run Out of Money Age</th>
-            <th>Total Needed</th>
-            <th>Delete</th>
-        </tr>
-    `;
+  const table = document.getElementById("scenario-comparison");
 
-    // Add saved scenarios
-    savedScenarios.forEach((scenario, index) => {
-        const row = document.createElement("tr");
-        row.innerHTML = `
-            <td>Scenario ${index + 1}</td>
-            <td>${scenario.retirementAge}</td>
-            <td>$${scenario.afterRetIncome.toLocaleString()}</td>
-            <td>$${scenario.desiredIncome.toLocaleString()}</td>
-            <td>${scenario.runOutOfMoneyAge}</td>
-            <td>$${scenario.totalNeeded.toLocaleString()}</td>
-            <td><button class="delete-btn" data-id="${scenario.id}">🗑</button></td>
-        `;
-        table.appendChild(row);
-    });
+  if (!table) {
+      console.error("Scenario comparison table not found!");
+      return;
+  }
 
-    // Add delete event listeners
-    document.querySelectorAll(".delete-btn").forEach(button => {
-        button.addEventListener("click", deleteScenario);
-    });
+  // Clear existing rows except for headers
+  table.innerHTML = `
+      <tr>
+          <th>Scenario</th>
+          <th>Retirement Age</th>
+          <th>After Retirement Income</th>
+          <th>Yearly Desired Income</th>
+          <th>Run Out of Money Age</th>
+          <th>Total Needed</th>
+          <th>Delete</th>
+      </tr>
+  `;
+
+  // Check if there are any scenarios
+  if (savedScenarios.length === 0) {
+      console.log("No scenarios to display.");
+      return;
+  }
+
+  // Add saved scenarios
+  savedScenarios.forEach((scenario, index) => {
+      console.log(`Rendering Scenario ${index + 1}:`, scenario);
+
+      const row = document.createElement("tr");
+      row.innerHTML = `
+          <td>Scenario ${index + 1}</td>
+          <td>${scenario.retirementAge}</td>
+          <td>$${scenario.afterRetIncome.toLocaleString()}</td>
+          <td>$${scenario.desiredIncome.toLocaleString()}</td>
+          <td>${scenario.runOutOfMoneyAge}</td>
+          <td>$${scenario.totalNeeded.toLocaleString()}</td>
+          <td><button class="delete-btn" data-id="${scenario.id}">🗑</button></td>
+      `;
+      table.appendChild(row);
+  });
+
+  // Add delete event listeners
+  document.querySelectorAll(".delete-btn").forEach(button => {
+      button.addEventListener("click", deleteScenario);
+  });
 }
+
 
 // Function to delete a scenario
 function deleteScenario(event) {
