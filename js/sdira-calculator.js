@@ -57,10 +57,13 @@ function calculateRetirement() {
         balance * (isRetired ? inputs.postRetReturn : inputs.preRetReturn)
       );
       const annualWithdrawal = isRetired
-        ? Math.ceil(
-            initialWithdrawal *
-              Math.pow(1 + inputs.costInflation, age - inputs.retirementAge)
-          )
+        ? Math.max(
+            0, // Ensure no negative withdrawal
+            Math.ceil(
+                (initialWithdrawal - inputs.afterRetIncome) * 
+                Math.pow(1 + inputs.costInflation, age - inputs.retirementAge)
+            )
+            )
         : 0;
 
       const beginningBalance = balance;
@@ -179,6 +182,7 @@ function calculateRetirement() {
 function getInputs() {
   return {
     desiredIncome: parseFloat(document.getElementById("desired-income").value),
+    afterRetIncome: parseFloat(document.getElementById("after-ret-income").value) || 0, // New input field
     preRetReturn: parseFloat(document.getElementById("pre-ret").value) / 100,
     postRetReturn: parseFloat(document.getElementById("post-ret").value) / 100,
     currentAge: parseInt(document.getElementById("current-age").value),
@@ -206,6 +210,11 @@ const validationRules = {
     min: 0,
     max: 1000000000,
     message: "Desired income must be between $0 and $1,000,000,000",
+  },
+  afterRetIncome: {
+    min: 0,
+    max: 1000000000,
+    message: "After Retirement Income must be between $0 and $1,000,000,000",
   },
   preRetReturn: {
     min: -20,
@@ -351,24 +360,25 @@ function recalculateWithRecommendedAge(recommendedAge) {
 }
 
 function updateSummary(
-  inputs,
-  runOutOfMoneyAge,
-  isSelfSustaining,
-  recommendedAge,
-  totalAmountNeeded
-) {
-  const summaryDiv = document.getElementById("summary");
-  summaryDiv.innerHTML = `
-        <p><strong>Plan Sustainability:</strong> ${
-          isSelfSustaining ? "Sustainable" : "Unsustainable"
-        }</p>
-        <p><strong>Run Out of Money Age:</strong> ${
-          runOutOfMoneyAge || "Never"
-        }</p>
-        <p><strong>Recommended Retirement Age:</strong> ${recommendedAge}</p>
-        <p><strong>Total Amount Needed for Retirement:</strong> $${totalAmountNeeded.toLocaleString()}</p>
-    `;
-}
+    inputs,
+    runOutOfMoneyAge,
+    isSelfSustaining,
+    recommendedAge,
+    totalAmountNeeded
+  ) {
+    const summaryDiv = document.getElementById("summary");
+    summaryDiv.innerHTML = `
+          <p><strong>Plan Sustainability:</strong> ${
+            isSelfSustaining ? "Sustainable" : "Unsustainable"
+          }</p>
+          <p><strong>Run Out of Money Age:</strong> ${
+            runOutOfMoneyAge || "Never"
+          }</p>
+          <p><strong>Recommended Retirement Age:</strong> ${recommendedAge}</p>
+          <p><strong>Total Amount Needed for Retirement:</strong> $${totalAmountNeeded.toLocaleString()}</p>
+          <p><strong>After Retirement Income:</strong> $${inputs.afterRetIncome.toLocaleString()}</p>
+      `;
+  }
 
 function renderCharts(data) {
   const ages = data.map((row) => row.age);
@@ -686,4 +696,10 @@ function downloadPDF() {
 // Initialize the calculator when the document is ready
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Document is fully loaded");
+  document.querySelectorAll(".info-icon").forEach(icon => {
+    icon.addEventListener("click", (event) => {
+        event.stopPropagation(); 
+        alert(icon.getAttribute("data-tooltip"));
+    });
+  });
 });
