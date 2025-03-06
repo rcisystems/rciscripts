@@ -1,9 +1,3 @@
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
-<script src="https://link.msgsndr.com/js/form_embed.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-
-<script>
 // Load required libraries
 let useRecommendedAge = false; // Track whether the recommended age is being used
 
@@ -693,5 +687,3 @@ function downloadPDF() {
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Document is fully loaded");
 });
-
-</script>
