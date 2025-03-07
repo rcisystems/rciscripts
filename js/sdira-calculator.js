@@ -727,7 +727,7 @@ function downloadPDF() {
   };
 
   // Load logo (ensure correct path or base64 encoding)
-  const logoPath = "https://assets.cdn.filesafe.space/9wih8cCeGbwoNA2Aw7sS/media/e8cdb38e-e38e-4b8a-b9ad-6e2ba62ca829.png";
+  const logoPath = "https://images.leadconnectorhq.com/image/f_webp/q_80/r_1200/u_https://assets.cdn.filesafe.space/9wih8cCeGbwoNA2Aw7sS/media/e8cdb38e-e38e-4b8a-b9ad-6e2ba62ca829.png";
 
   // Add Logo
   doc.addImage(logoPath, "PNG", 65, 10, 80, 20); // Centered logo
