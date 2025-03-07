@@ -713,7 +713,7 @@ function showFormPopup() {
   }, 5000);
 }
 
-async function downloadPDF() {
+async function downloadPDF(totalAmountNeeded) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
 
@@ -790,7 +790,7 @@ async function downloadPDF() {
       let currentY = doc.previousAutoTable.finalY + 10;
 
       // Add Progress Bar
-      let progress = (inputs.currentBalance / inputs.desiredIncome) * 100;
+      let progress = (inputs.currentBalance / totalAmountNeeded) * 100;
       progress = Math.min(progress, 100); // Cap at 100%
 
       console.log(`Progress Calculation: ${progress.toFixed(2)}%`); // Debugging log
