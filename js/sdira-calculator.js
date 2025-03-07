@@ -717,6 +717,27 @@ async function downloadPDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
 
+  console.log("Starting PDF generation...");
+
+  // Ensure the amortization table is fully generated before proceeding
+  const scheduleTable = document.getElementById("amortization-schedule");
+  if (!scheduleTable) {
+      console.error("Error: Amortization table not found in DOM.");
+      alert("The amortization table is missing. Please run the calculation first.");
+      return;
+  }
+
+  console.log("Amortization Table Found.");
+
+  const rows = scheduleTable.getElementsByTagName("tr");
+  console.log(`Total Rows Found in Table: ${rows.length}`);
+
+  if (rows.length <= 1) {
+      console.error("Error: No data rows found in the amortization table.");
+      alert("The amortization table is empty. Run a calculation before exporting.");
+      return;
+  }
+
   // Brand Colors
   const brandColors = {
       primary: "#0E1F47",  // Dark Navy
@@ -730,100 +751,77 @@ async function downloadPDF() {
   const logoUrl = "https://storage.googleapis.com/msgsndr/9wih8cCeGbwoNA2Aw7sS/media/6516057e5cf2e9e6e5680f92.png";
 
   try {
+      console.log("Fetching logo...");
+
       // Convert Logo URL to Base64
       const logoBase64 = await getBase64FromUrl(logoUrl);
 
-      // Add Logo (Centered)
+      // Add Logo
       doc.addImage(logoBase64, "PNG", 60, 10, 90, 20);
-
-      // Add Title
       doc.setFontSize(18);
       doc.setTextColor(brandColors.primary);
       doc.text("Retirement Calculation Report", 60, 40);
-
-      // Draw Separator Line
       doc.setDrawColor(brandColors.secondary);
       doc.line(10, 45, 200, 45);
 
-      // Summary Section
-      doc.setFontSize(12);
-      doc.setTextColor(brandColors.primary);
-      doc.text("Summary of Inputs:", 10, 55);
-
-      doc.setFontSize(10);
+      // Collect Inputs
+      console.log("Collecting inputs...");
       const inputs = getInputs();
-      const summaryTable = [
-          ["Desired Income", `$${inputs.desiredIncome.toLocaleString()}`],
-          ["After Retirement Income", `$${inputs.afterRetIncome.toLocaleString()}`],
-          ["Pre-Retirement Return", `${(inputs.preRetReturn * 100).toFixed(2)}%`],
-          ["Post-Retirement Return", `${(inputs.postRetReturn * 100).toFixed(2)}%`],
-          ["Current Age", `${inputs.currentAge}`],
-          ["Retirement Age", `${inputs.retirementAge}`],
-          ["Current Balance", `$${inputs.currentBalance.toLocaleString()}`],
-          ["Wage Inflation", `${(inputs.wageInflation * 100).toFixed(2)}%`],
-          ["Cost of Living Inflation", `${(inputs.costInflation * 100).toFixed(2)}%`],
-          ["Annual Savings Rate", `${(inputs.annualSavingsRate * 100).toFixed(2)}%`],
-          ["Life Expectancy", `${inputs.lifeExpectancy}`],
-      ];
+      console.log("Inputs Collected:", inputs);
 
+      // Summary Table
       doc.autoTable({
           startY: 60,
           head: [["Category", "Value"]],
-          body: summaryTable,
+          body: [
+              ["Desired Income", `$${inputs.desiredIncome.toLocaleString()}`],
+              ["After Retirement Income", `$${inputs.afterRetIncome.toLocaleString()}`],
+              ["Pre-Retirement Return", `${(inputs.preRetReturn * 100).toFixed(2)}%`],
+              ["Post-Retirement Return", `${(inputs.postRetReturn * 100).toFixed(2)}%`],
+              ["Current Age", `${inputs.currentAge}`],
+              ["Retirement Age", `${inputs.retirementAge}`],
+              ["Current Balance", `$${inputs.currentBalance.toLocaleString()}`],
+              ["Wage Inflation", `${(inputs.wageInflation * 100).toFixed(2)}%`],
+              ["Cost of Living Inflation", `${(inputs.costInflation * 100).toFixed(2)}%`],
+              ["Annual Savings Rate", `${(inputs.annualSavingsRate * 100).toFixed(2)}%`],
+              ["Life Expectancy", `${inputs.lifeExpectancy}`],
+          ],
           theme: "grid",
-          headStyles: {
-              fillColor: brandColors.secondary,
-              textColor: brandColors.white,
-          },
-          bodyStyles: {
-              textColor: brandColors.primary,
-          },
-          alternateRowStyles: {
-              fillColor: brandColors.light,
-          },
-          styles: {
-              fontSize: 9,
-          },
+          headStyles: { fillColor: brandColors.secondary, textColor: brandColors.white },
+          bodyStyles: { textColor: brandColors.primary },
+          alternateRowStyles: { fillColor: brandColors.light },
+          styles: { fontSize: 9 },
           margin: { left: 10, right: 10 },
       });
 
-      let currentY = doc.previousAutoTable.finalY + 10;
+      console.log("Summary Table Added to PDF.");
 
-      // Add Progress Bar
-      let progress = (inputs.currentBalance / inputs.desiredIncome) * 100;
-      progress = Math.min(progress, 100);
+      // Extract and Log Table Data
+      console.log("Extracting Amortization Table...");
 
-      doc.setFillColor(brandColors.light);
-      doc.rect(10, currentY, 190, 10, "F"); // Background Bar
+      let tableData = [];
+      for (let i = 1; i < rows.length; i++) {
+          const cells = rows[i].getElementsByTagName("td");
+          if (cells.length > 0) {
+              tableData.push([
+                  cells[0].innerText, // Age
+                  cells[1].innerText, // Yearly Income
+                  cells[2].innerText, // Beginning Balance
+                  cells[3].innerText, // Earnings
+                  cells[4].innerText, // Annual Savings
+                  cells[5].innerText, // Annual Withdrawal
+                  cells[6].innerText, // Ending Balance
+                  cells[7].innerText, // Withdrawal Rate
+              ]);
+          }
+      }
 
-      doc.setFillColor(progress < 50 ? "#e74c3c" : progress < 80 ? "#f39c12" : "#2ecc71"); // Red, Orange, Green
-      doc.rect(10, currentY, (190 * progress) / 100, 10, "F");
+      console.log("Extracted Data for Amortization Table:", tableData);
 
-      doc.setTextColor(brandColors.primary);
-      doc.setFontSize(10);
-      doc.text(`Savings Progress: ${progress.toFixed(2)}%`, 75, currentY + 7);
-
-      currentY += 20;
-
-      // Add a new page for Charts
-      doc.addPage();
-      doc.setFontSize(12);
-      doc.text("Retirement Fund Charts", 10, 20);
-
-      // Get Chart Images
-      const balanceChartCanvas = document.getElementById("balanceChart");
-      const incomeWithdrawalChartCanvas = document.getElementById("incomeWithdrawalChart");
-
-      if (balanceChartCanvas && incomeWithdrawalChartCanvas) {
-          const balanceChartImg = balanceChartCanvas.toDataURL("image/png");
-          const incomeWithdrawalChartImg = incomeWithdrawalChartCanvas.toDataURL("image/png");
-
-          // Add Balance Chart to PDF
-          doc.addImage(balanceChartImg, "PNG", 10, 30, 180, 70);
-          doc.addPage(); // New page for second chart
-
-          // Add Income vs. Withdrawal Chart to PDF
-          doc.addImage(incomeWithdrawalChartImg, "PNG", 10, 20, 180, 70);
+      if (tableData.length === 0) {
+          console.error("No data found in amortization table.");
+          alert("The amortization table is empty. Run a calculation before exporting.");
+          return;
       }
 
       // Ensure amortization table starts on a new page
@@ -832,54 +830,21 @@ async function downloadPDF() {
       doc.setTextColor(brandColors.primary);
       doc.text("Retirement Fund Projection", 10, 20);
 
-      const scheduleTable = document.getElementById("amortization-schedule");
-      if (scheduleTable) {
-          const rows = scheduleTable.getElementsByTagName("tr");
+      doc.autoTable({
+          startY: 25,
+          head: [
+              ["Age", "Income", "Balance", "Earnings", "Savings", "Withdrawal", "Ending Balance", "Rate (%)"],
+          ],
+          body: tableData,
+          theme: "grid",
+          headStyles: { fillColor: brandColors.secondary, textColor: brandColors.white },
+          bodyStyles: { textColor: brandColors.primary },
+          alternateRowStyles: { fillColor: brandColors.light },
+          styles: { fontSize: 8 },
+          margin: { left: 10, right: 10 },
+      });
 
-          let tableData = [];
-          for (let i = 1; i < rows.length; i++) {
-              const cells = rows[i].getElementsByTagName("td");
-              if (cells.length > 0) {
-                  tableData.push([
-                      cells[0].innerText,
-                      cells[1].innerText,
-                      cells[2].innerText,
-                      cells[3].innerText,
-                      cells[4].innerText,
-                      cells[5].innerText,
-                      cells[6].innerText,
-                      cells[7].innerText,
-                  ]);
-              }
-          }
-
-          if (tableData.length > 0) {
-              doc.autoTable({
-                  startY: 25,
-                  head: [
-                      ["Age", "Income", "Balance", "Earnings", "Savings", "Withdrawal", "Ending Balance", "Rate (%)"],
-                  ],
-                  body: tableData,
-                  theme: "grid",
-                  headStyles: {
-                      fillColor: brandColors.secondary,
-                      textColor: brandColors.white,
-                  },
-                  bodyStyles: {
-                      textColor: brandColors.primary,
-                  },
-                  alternateRowStyles: {
-                      fillColor: brandColors.light,
-                  },
-                  styles: {
-                      fontSize: 8,
-                  },
-                  margin: { left: 10, right: 10 },
-              });
-          } else {
-              doc.text("No amortization data available.", 10, 30);
-          }
-      }
+      console.log("Amortization Table Successfully Added to PDF.");
 
       // Footer
       doc.setFontSize(10);
@@ -888,10 +853,12 @@ async function downloadPDF() {
       doc.line(10, 285, 200, 285);
 
       // Save the PDF
+      console.log("Saving PDF...");
       doc.save("retirement_calculation_results.pdf");
+      console.log("PDF Saved Successfully.");
 
   } catch (error) {
-      console.error("Error loading logo or charts:", error);
+      console.error("Error generating PDF:", error);
   }
 }
 
@@ -905,11 +872,6 @@ async function getBase64FromUrl(url) {
       reader.readAsDataURL(blob);
   });
 }
-
-
-
-
-
 
 
 // Initialize the calculator when the document is ready
