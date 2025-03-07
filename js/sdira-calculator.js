@@ -724,6 +724,15 @@ async function downloadPDF(totalAmountNeeded) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
 
+  console.log("Starting PDF generation...");
+
+  // Check if autoTable is available
+  if (typeof doc.autoTable !== "function") {
+    console.error("jspdf-autotable plugin is missing!");
+    alert("Error: The PDF export is missing the required table plugin. Please check the script includes.");
+    return;
+  }
+
   // Brand Colors
   const brandColors = {
       primary: "#0E1F47",  // Dark Navy
@@ -773,6 +782,8 @@ async function downloadPDF(totalAmountNeeded) {
           ["Life Expectancy", `${inputs.lifeExpectancy}`],
       ];
 
+      console.log("Summary Table Added to PDF.");
+
       doc.autoTable({
           startY: 60,
           head: [["Category", "Value"]],
@@ -793,6 +804,8 @@ async function downloadPDF(totalAmountNeeded) {
           },
           margin: { left: 10, right: 10 },
       });
+
+
 
       let currentY = doc.previousAutoTable.finalY + 10;
 
@@ -846,6 +859,8 @@ async function downloadPDF(totalAmountNeeded) {
           doc.addImage(incomeWithdrawalChartImg, "PNG", 10, 20, 180, 70);
       }
 
+      console.log("Amortization Table Found.");
+
       // Ensure amortization table starts on a new page
       doc.addPage();
       doc.setFontSize(12);
@@ -872,6 +887,8 @@ async function downloadPDF(totalAmountNeeded) {
                   ]);
               }
           }
+
+          console.log("Extracted Data for Amortization Table:", tableData);
 
           if (tableData.length > 0) {
               doc.autoTable({
@@ -901,6 +918,7 @@ async function downloadPDF(totalAmountNeeded) {
           }
       }
 
+
       // Footer
       doc.setFontSize(10);
       doc.setTextColor(brandColors.secondary);
@@ -908,7 +926,11 @@ async function downloadPDF(totalAmountNeeded) {
       doc.line(10, 285, 200, 285);
 
       // Save the PDF
+      console.log("Saving PDF...");
+
       doc.save("retirement_calculation_results.pdf");
+
+      console.log("PDF Saved Successfully.");
 
   } catch (error) {
       console.error("Error loading logo or charts:", error);
