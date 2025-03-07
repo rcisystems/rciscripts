@@ -727,7 +727,7 @@ async function downloadPDF() {
   };
 
   // Logo URL
-  const logoUrl = "https://images.leadconnectorhq.com/image/f_webp/q_80/r_1200/u_https://assets.cdn.filesafe.space/9wih8cCeGbwoNA2Aw7sS/media/e8cdb38e-e38e-4b8a-b9ad-6e2ba62ca829.png";
+  const logoUrl = "https://storage.googleapis.com/msgsndr/9wih8cCeGbwoNA2Aw7sS/media/65160598bfbfe07049a3bdfb.png";
 
   try {
       // Convert Logo URL to Base64
