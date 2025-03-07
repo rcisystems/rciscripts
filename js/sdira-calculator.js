@@ -407,7 +407,6 @@ function updateSummary(
     }
 }
 
-
   // Array to store saved scenarios
 let savedScenarios = [];
 
@@ -473,7 +472,6 @@ function saveScenario() {
   }
 }
 
-
 // Function to update the scenario comparison table
 function updateScenarioTable() {
   console.log("Updating Scenario Table...");
@@ -530,7 +528,6 @@ function updateScenarioTable() {
       button.addEventListener("click", deleteScenario);
   });
 }
-
 
 // Function to delete a scenario
 function deleteScenario(event) {
@@ -720,142 +717,152 @@ function downloadPDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
 
-  // Adding Title to the PDF
-  doc.setFontSize(14);
-  doc.text("Retirement Calculation Results", 10, 10);
+  // Load brand colors (from uploaded image)
+  const brandColors = {
+      primary: "#0E1F47",  // Dark Navy
+      secondary: "#B8864B", // Brown-Gold
+      highlight: "#D6AE5C", // Gold
+      light: "#E6E0D5",     // Beige
+      white: "#FFFFFF"
+  };
+
+  // Load logo (ensure correct path or base64 encoding)
+  const logoPath = "https://assets.cdn.filesafe.space/9wih8cCeGbwoNA2Aw7sS/media/e8cdb38e-e38e-4b8a-b9ad-6e2ba62ca829.png";
+
+  // Add Logo
+  doc.addImage(logoPath, "PNG", 65, 10, 80, 20); // Centered logo
+
+  // Add Title
+  doc.setFontSize(18);
+  doc.setTextColor(brandColors.primary);
+  doc.text("Retirement Calculation Report", 65, 40);
+
+  // Draw a separator line
+  doc.setDrawColor(brandColors.secondary);
+  doc.line(10, 45, 200, 45);
 
   // Adding Summary of Inputs as a Table
+  doc.setFontSize(12);
+  doc.setTextColor(brandColors.primary);
+  doc.text("Summary of Inputs:", 10, 55);
+  
   doc.setFontSize(10);
-  doc.text("Summary of Inputs:", 10, 20);
-  doc.setFontSize(8);
-
   const inputs = getInputs();
   const summaryTable = [
-    ["Desired Income", `$${inputs.desiredIncome.toLocaleString()}`],
-    ["Pre-Retirement Return", `${(inputs.preRetReturn * 100).toFixed(2)}%`],
-    ["Post-Retirement Return", `${(inputs.postRetReturn * 100).toFixed(2)}%`],
-    ["Current Age", `${inputs.currentAge}`],
-    ["Retirement Age", `${inputs.retirementAge}`],
-    ["Current Balance", `$${inputs.currentBalance.toLocaleString()}`],
-    ["Wage Inflation", `${(inputs.wageInflation * 100).toFixed(2)}%`],
-    ["Cost of Living Inflation", `${(inputs.costInflation * 100).toFixed(2)}%`],
-    ["Current Income", `$${inputs.currentIncome.toLocaleString()}`],
-    ["Annual Savings Rate", `${(inputs.annualSavingsRate * 100).toFixed(2)}%`],
-    ["Life Expectancy", `${inputs.lifeExpectancy}`],
+      ["Desired Income", `$${inputs.desiredIncome.toLocaleString()}`],
+      ["After Retirement Income", `$${inputs.afterRetIncome.toLocaleString()}`],
+      ["Pre-Retirement Return", `${(inputs.preRetReturn * 100).toFixed(2)}%`],
+      ["Post-Retirement Return", `${(inputs.postRetReturn * 100).toFixed(2)}%`],
+      ["Current Age", `${inputs.currentAge}`],
+      ["Retirement Age", `${inputs.retirementAge}`],
+      ["Current Balance", `$${inputs.currentBalance.toLocaleString()}`],
+      ["Wage Inflation", `${(inputs.wageInflation * 100).toFixed(2)}%`],
+      ["Cost of Living Inflation", `${(inputs.costInflation * 100).toFixed(2)}%`],
+      ["Annual Savings Rate", `${(inputs.annualSavingsRate * 100).toFixed(2)}%`],
+      ["Life Expectancy", `${inputs.lifeExpectancy}`],
   ];
 
-  let startY = 25;
-  summaryTable.forEach(([key, value]) => {
-    doc.text(key, 10, startY);
-    doc.text(value, 90, startY);
-    doc.setDrawColor(200);
-    doc.line(10, startY - 3, 200, startY - 3); // Top line
-    doc.line(10, startY + 3, 200, startY + 3); // Bottom line
-    doc.line(10, startY - 3, 10, startY + 3); // Left line
-    doc.line(200, startY - 3, 200, startY + 3); // Right line
-    startY += 6;
+  doc.autoTable({
+      startY: 60,
+      head: [["Category", "Value"]],
+      body: summaryTable,
+      theme: "grid",
+      headStyles: {
+          fillColor: brandColors.secondary,
+          textColor: brandColors.white,
+      },
+      bodyStyles: {
+          textColor: brandColors.primary,
+      },
+      alternateRowStyles: {
+          fillColor: brandColors.light,
+      },
+      styles: {
+          fontSize: 9,
+      },
+      margin: { left: 10, right: 10 },
   });
 
-  // Adding Charts to the PDF
-  const balanceChartCanvas = document.getElementById("balanceChart");
-  const incomeWithdrawalChartCanvas = document.getElementById(
-    "incomeWithdrawalChart"
-  );
+  let currentY = doc.previousAutoTable.finalY + 10;
 
-  if (balanceChartCanvas && incomeWithdrawalChartCanvas) {
-    const balanceChartImg = balanceChartCanvas.toDataURL("image/png");
-    const incomeWithdrawalChartImg =
-      incomeWithdrawalChartCanvas.toDataURL("image/png");
+  // Draw a progress bar based on how close they are to their goal
+  let progress = (inputs.currentBalance / inputs.desiredIncome) * 100;
+  progress = Math.min(progress, 100); // Cap at 100%
 
-    // Add Balance Chart to PDF
-    doc.addImage(balanceChartImg, "PNG", 10, startY + 10, 180, 70);
-    // Add Income vs Withdrawal Chart to PDF
-    doc.addImage(incomeWithdrawalChartImg, "PNG", 10, startY + 90, 180, 70);
-  }
+  doc.setFillColor(brandColors.light);
+  doc.rect(10, currentY, 190, 10, "F"); // Background Bar
 
-  // Add a new page for the table
+  doc.setFillColor(progress < 50 ? "#e74c3c" : progress < 80 ? "#f39c12" : "#2ecc71"); // Red, Orange, Green based on progress
+  doc.rect(10, currentY, (190 * progress) / 100, 10, "F"); // Progress Fill
+
+  doc.setTextColor(brandColors.primary);
+  doc.setFontSize(10);
+  doc.text(`Savings Progress: ${progress.toFixed(2)}%`, 75, currentY + 7);
+
+  currentY += 20;
+
+  // Add a new page for the balance table
   doc.addPage();
 
-  // Adding Table to the PDF
-  startY = 20;
-  const lineHeight = 6;
+  // Adding Amortization Table
+  doc.setFontSize(12);
+  doc.setTextColor(brandColors.primary);
+  doc.text("Retirement Fund Projection", 10, 20);
+
   const scheduleTable = document.getElementById("amortization-schedule");
   if (scheduleTable) {
-    const rows = scheduleTable.getElementsByTagName("tr");
+      const rows = scheduleTable.getElementsByTagName("tr");
 
-    // Set up table headers
-    doc.setFontSize(7);
-    doc.setTextColor(255, 255, 255);
-    doc.setFillColor(8, 32, 71);
-    doc.rect(10, startY - 5, 190, 7, "F");
-    doc.text("Age", 12, startY);
-    doc.text("Yearly Income", 22, startY);
-    doc.text("Beginning Balance", 42, startY);
-    doc.text("Earnings", 70, startY);
-    doc.text("Annual Savings", 95, startY);
-    doc.text("Annual Withdrawal", 120, startY);
-    doc.text("Ending Balance", 150, startY);
-    doc.text("Withdrawal Rate (%)", 175, startY);
-    startY += lineHeight;
-
-    // Add table content
-    doc.setTextColor(0, 0, 0);
-    for (let i = 1; i < rows.length; i++) {
-      const cells = rows[i].getElementsByTagName("td");
-      if (cells.length > 0) {
-        const rowClass = rows[i].className;
-        if (rowClass.includes("highlight-yellow")) {
-          doc.setFillColor(255, 235, 59);
-          doc.rect(10, startY - 5, 190, lineHeight, "F");
-        } else if (rowClass.includes("highlight-red")) {
-          doc.setFillColor(244, 67, 54);
-          doc.rect(10, startY - 5, 190, lineHeight, "F");
-        }
-
-        // Draw grid lines
-        doc.setDrawColor(200);
-        doc.line(10, startY - 5, 200, startY - 5);
-        doc.line(10, startY + 1, 200, startY + 1);
-        doc.line(10, startY - 5, 10, startY + 1);
-        doc.line(200, startY - 5, 200, startY + 1);
-
-        // Add cell text
-        doc.text(cells[0].innerText, 12, startY);
-        doc.text(
-          cells[1].innerText === "-" ? "0" : cells[1].innerText,
-          22,
-          startY
-        );
-        doc.text(
-          Math.max(0, parseFloat(cells[2].innerText)).toFixed(2),
-          42,
-          startY
-        );
-        doc.text(
-          Math.max(0, parseFloat(cells[3].innerText)).toFixed(2),
-          70,
-          startY
-        );
-        doc.text(cells[4].innerText, 95, startY);
-        doc.text(cells[5].innerText, 120, startY);
-        doc.text(cells[6].innerText, 150, startY);
-        doc.text(cells[7].innerText, 175, startY);
-
-        startY += lineHeight;
-
-        if (startY > 280) {
-          doc.addPage();
-          startY = 20;
-        }
+      let tableData = [];
+      for (let i = 1; i < rows.length; i++) {
+          const cells = rows[i].getElementsByTagName("td");
+          if (cells.length > 0) {
+              tableData.push([
+                  cells[0].innerText, // Age
+                  cells[1].innerText, // Yearly Income
+                  cells[2].innerText, // Beginning Balance
+                  cells[3].innerText, // Earnings
+                  cells[4].innerText, // Annual Savings
+                  cells[5].innerText, // Annual Withdrawal
+                  cells[6].innerText, // Ending Balance
+                  cells[7].innerText, // Withdrawal Rate
+              ]);
+          }
       }
-    }
+
+      doc.autoTable({
+          startY: 25,
+          head: [
+              ["Age", "Income", "Balance", "Earnings", "Savings", "Withdrawal", "Ending Balance", "Rate (%)"],
+          ],
+          body: tableData,
+          theme: "grid",
+          headStyles: {
+              fillColor: brandColors.secondary,
+              textColor: brandColors.white,
+          },
+          bodyStyles: {
+              textColor: brandColors.primary,
+          },
+          alternateRowStyles: {
+              fillColor: brandColors.light,
+          },
+          styles: {
+              fontSize: 8,
+          },
+          margin: { left: 10, right: 10 },
+      });
   }
+
+  // Add footer with branding
+  doc.setFontSize(10);
+  doc.setTextColor(brandColors.secondary);
+  doc.text("Rise Capital Investments - Smart Retirement Planning", 60, 290);
+  doc.line(10, 285, 200, 285);
 
   // Save the PDF
   doc.save("retirement_calculation_results.pdf");
 }
-
-
 
 // Initialize the calculator when the document is ready
 document.addEventListener("DOMContentLoaded", () => {
