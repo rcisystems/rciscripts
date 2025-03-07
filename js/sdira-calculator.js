@@ -801,8 +801,6 @@ async function downloadPDF() {
 
       console.log("Summary Table Added to PDF.");
 
-      let currentY = doc.previousAutoTable.finalY + 10;
-
       // Add Progress Bar
       let progress = (inputs.currentBalance / inputs.desiredIncome) * 100;
       progress = Math.min(progress, 100); // Cap at 100%
@@ -830,7 +828,7 @@ async function downloadPDF() {
       doc.setFontSize(10);
       doc.text(`You have saved ${progress.toFixed(2)}% of your retirement goal.`, 60, currentY + 7);
 
-      currentY += 20; // Move down after progress bar
+      currentY += 20; // Move down after progress bar 
 
       // Extract and Log Table Data
       console.log("Extracting Amortization Table...");
