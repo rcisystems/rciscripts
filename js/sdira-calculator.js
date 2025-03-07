@@ -636,21 +636,21 @@ function renderCharts(data) {
   });
 }
 
-function addDownloadButton() {
+function addDownloadButton(totalAmountNeeded) {
   console.log("Adding download button after successful calculation");
 
   const pdfContainer = document.getElementById("pdf-download-container");
   if (pdfContainer) {
-    pdfContainer.innerHTML = ""; // Clear any existing button
-    const downloadButton = document.createElement("button");
-    downloadButton.textContent = "Download PDF";
-    downloadButton.id = "download-pdf-button";
-    downloadButton.onclick = () => {
-      showFormPopup();
-    };
-    pdfContainer.appendChild(downloadButton);
+      pdfContainer.innerHTML = ""; // Clear any existing button
+      const downloadButton = document.createElement("button");
+      downloadButton.textContent = "Download PDF";
+      downloadButton.id = "download-pdf-button";
+      downloadButton.onclick = () => {
+          downloadPDF(totalAmountNeeded); // Pass totalAmountNeeded to the function
+      };
+      pdfContainer.appendChild(downloadButton);
   } else {
-    console.error("Download container not found");
+      console.error("Download container not found");
   }
 }
 
