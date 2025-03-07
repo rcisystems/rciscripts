@@ -142,7 +142,14 @@ function calculateRetirement() {
       );
       recommendedAge = findRecommendedRetirementAge(inputs);
     }
+    
+    // Ensure totalAmountNeeded is valid
+    if (!totalAmountNeeded || isNaN(totalAmountNeeded) || totalAmountNeeded <= 0) {
+      console.warn("Warning: totalAmountNeeded is invalid, setting default value.");
+      totalAmountNeeded = 1; // Prevents division by zero
+    }
 
+    console.log(`Total Amount Needed for Retirement: $${totalAmountNeeded.toLocaleString()}`);
     // Update summary and render charts
     updateSummary(
       inputs,
