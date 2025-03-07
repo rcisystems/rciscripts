@@ -170,7 +170,7 @@ function calculateRetirement() {
     }
 
     // Add download button only after successful calculation
-    addDownloadButton();
+    addDownloadButton(totalAmountNeeded);
   } catch (error) {
     // Clear any existing download button if calculation fails
     const pdfContainer = document.getElementById("pdf-download-container");
