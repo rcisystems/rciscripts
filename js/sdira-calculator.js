@@ -853,7 +853,7 @@ async function downloadPDF(totalAmountNeeded) {
 
           // Add Balance Chart to PDF
           doc.addImage(balanceChartImg, "PNG", 10, 30, 180, 70);
-          doc.addPage(); // New page for second chart
+          // doc.addPage(); // New page for second chart
 
           // Add Income vs. Withdrawal Chart to PDF
           doc.addImage(incomeWithdrawalChartImg, "PNG", 10, 20, 180, 70);
