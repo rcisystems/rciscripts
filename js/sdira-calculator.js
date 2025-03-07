@@ -717,8 +717,6 @@ async function downloadPDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
 
-  console.log("🔹 Starting PDF Generation...");
-
   // Brand Colors
   const brandColors = {
       primary: "#0E1F47",  // Dark Navy
@@ -732,13 +730,8 @@ async function downloadPDF() {
   const logoUrl = "https://storage.googleapis.com/msgsndr/9wih8cCeGbwoNA2Aw7sS/media/6516057e5cf2e9e6e5680f92.png";
 
   try {
-      console.log("🔹 Fetching Logo...");
+      // Convert Logo URL to Base64
       const logoBase64 = await getBase64FromUrl(logoUrl);
-      if (!logoBase64) {
-          console.error("❌ Error: Logo could not be converted to Base64.");
-      } else {
-          console.log("✅ Logo successfully converted to Base64.");
-      }
 
       // Add Logo (Centered)
       doc.addImage(logoBase64, "PNG", 60, 10, 90, 20);
@@ -757,71 +750,158 @@ async function downloadPDF() {
       doc.setTextColor(brandColors.primary);
       doc.text("Summary of Inputs:", 10, 55);
 
-      // Get Inputs
+      doc.setFontSize(10);
       const inputs = getInputs();
-      console.log("🔹 Inputs:", inputs);
+      const summaryTable = [
+          ["Desired Income", `$${inputs.desiredIncome.toLocaleString()}`],
+          ["After Retirement Income", `$${inputs.afterRetIncome.toLocaleString()}`],
+          ["Pre-Retirement Return", `${(inputs.preRetReturn * 100).toFixed(2)}%`],
+          ["Post-Retirement Return", `${(inputs.postRetReturn * 100).toFixed(2)}%`],
+          ["Current Age", `${inputs.currentAge}`],
+          ["Retirement Age", `${inputs.retirementAge}`],
+          ["Current Balance", `$${inputs.currentBalance.toLocaleString()}`],
+          ["Wage Inflation", `${(inputs.wageInflation * 100).toFixed(2)}%`],
+          ["Cost of Living Inflation", `${(inputs.costInflation * 100).toFixed(2)}%`],
+          ["Annual Savings Rate", `${(inputs.annualSavingsRate * 100).toFixed(2)}%`],
+          ["Life Expectancy", `${inputs.lifeExpectancy}`],
+      ];
 
-      // Get Charts from the DOM
-      console.log("🔹 Checking if charts exist...");
-      const balanceChartCanvas = document.getElementById("balanceChart");
-      const incomeWithdrawalChartCanvas = document.getElementById("incomeWithdrawalChart");
+      doc.autoTable({
+          startY: 60,
+          head: [["Category", "Value"]],
+          body: summaryTable,
+          theme: "grid",
+          headStyles: {
+              fillColor: brandColors.secondary,
+              textColor: brandColors.white,
+          },
+          bodyStyles: {
+              textColor: brandColors.primary,
+          },
+          alternateRowStyles: {
+              fillColor: brandColors.light,
+          },
+          styles: {
+              fontSize: 9,
+          },
+          margin: { left: 10, right: 10 },
+      });
 
-      if (!balanceChartCanvas || !incomeWithdrawalChartCanvas) {
-          console.error("❌ One or both chart elements are missing!");
-      } else {
-          console.log("✅ Charts found in the DOM.");
-      }
+      let currentY = doc.previousAutoTable.finalY + 10;
 
-      // Convert Charts to Images
-      let balanceChartImg, incomeWithdrawalChartImg;
-      try {
-          balanceChartImg = balanceChartCanvas.toDataURL("image/png");
-          incomeWithdrawalChartImg = incomeWithdrawalChartCanvas.toDataURL("image/png");
-          console.log("✅ Charts successfully converted to images.");
-      } catch (error) {
-          console.error("❌ Error converting charts to images:", error);
-      }
+      // Add Progress Bar
+      let progress = (inputs.currentBalance / inputs.desiredIncome) * 100;
+      progress = Math.min(progress, 100);
+
+      doc.setFillColor(brandColors.light);
+      doc.rect(10, currentY, 190, 10, "F"); // Background Bar
+
+      doc.setFillColor(progress < 50 ? "#e74c3c" : progress < 80 ? "#f39c12" : "#2ecc71"); // Red, Orange, Green
+      doc.rect(10, currentY, (190 * progress) / 100, 10, "F");
+
+      doc.setTextColor(brandColors.primary);
+      doc.setFontSize(10);
+      doc.text(`Savings Progress: ${progress.toFixed(2)}%`, 75, currentY + 7);
+
+      currentY += 20;
 
       // Add a new page for Charts
       doc.addPage();
       doc.setFontSize(12);
       doc.text("Retirement Fund Charts", 10, 20);
 
-      if (balanceChartImg && incomeWithdrawalChartImg) {
-          console.log("🔹 Adding Charts to PDF...");
+      // Get Chart Images
+      const balanceChartCanvas = document.getElementById("balanceChart");
+      const incomeWithdrawalChartCanvas = document.getElementById("incomeWithdrawalChart");
+
+      if (balanceChartCanvas && incomeWithdrawalChartCanvas) {
+          const balanceChartImg = balanceChartCanvas.toDataURL("image/png");
+          const incomeWithdrawalChartImg = incomeWithdrawalChartCanvas.toDataURL("image/png");
+
+          // Add Balance Chart to PDF
           doc.addImage(balanceChartImg, "PNG", 10, 30, 180, 70);
           doc.addPage(); // New page for second chart
+
+          // Add Income vs. Withdrawal Chart to PDF
           doc.addImage(incomeWithdrawalChartImg, "PNG", 10, 20, 180, 70);
-          console.log("✅ Charts added to PDF.");
-      } else {
-          console.warn("⚠️ Charts were not converted properly and will not appear in the PDF.");
       }
 
+      // Add a new page for the balance table
+      doc.addPage();
+      doc.setFontSize(12);
+      doc.setTextColor(brandColors.primary);
+      doc.text("Retirement Fund Projection", 10, 20);
+
+      const scheduleTable = document.getElementById("amortization-schedule");
+      if (scheduleTable) {
+          const rows = scheduleTable.getElementsByTagName("tr");
+
+          let tableData = [];
+          for (let i = 1; i < rows.length; i++) {
+              const cells = rows[i].getElementsByTagName("td");
+              if (cells.length > 0) {
+                  tableData.push([
+                      cells[0].innerText,
+                      cells[1].innerText,
+                      cells[2].innerText,
+                      cells[3].innerText,
+                      cells[4].innerText,
+                      cells[5].innerText,
+                      cells[6].innerText,
+                      cells[7].innerText,
+                  ]);
+              }
+          }
+
+          doc.autoTable({
+              startY: 25,
+              head: [
+                  ["Age", "Income", "Balance", "Earnings", "Savings", "Withdrawal", "Ending Balance", "Rate (%)"],
+              ],
+              body: tableData,
+              theme: "grid",
+              headStyles: {
+                  fillColor: brandColors.secondary,
+                  textColor: brandColors.white,
+              },
+              bodyStyles: {
+                  textColor: brandColors.primary,
+              },
+              alternateRowStyles: {
+                  fillColor: brandColors.light,
+              },
+              styles: {
+                  fontSize: 8,
+              },
+              margin: { left: 10, right: 10 },
+          });
+      }
+
+      // Footer
+      doc.setFontSize(10);
+      doc.setTextColor(brandColors.secondary);
+      doc.text("Rise Capital Investments - Smart Retirement Planning", 60, 290);
+      doc.line(10, 285, 200, 285);
+
       // Save the PDF
-      console.log("🔹 Saving PDF...");
       doc.save("retirement_calculation_results.pdf");
-      console.log("✅ PDF saved successfully.");
 
   } catch (error) {
-      console.error("❌ Error generating PDF:", error);
+      console.error("Error loading logo or charts:", error);
   }
 }
 
 // Helper function to fetch and convert logo URL to Base64
 async function getBase64FromUrl(url) {
-  try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      return new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.readAsDataURL(blob);
-      });
-  } catch (error) {
-      console.error("❌ Error fetching logo:", error);
-      return null;
-  }
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+  });
 }
+
 
 
 
