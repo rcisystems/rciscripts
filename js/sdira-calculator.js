@@ -727,7 +727,7 @@ async function downloadPDF() {
   };
 
   // Logo URL
-  const logoUrl = "https://storage.googleapis.com/msgsndr/9wih8cCeGbwoNA2Aw7sS/media/65160598bfbfe07049a3bdfb.png";
+  const logoUrl = "https://images.leadconnectorhq.com/image/f_webp/q_80/r_1200/u_https://assets.cdn.filesafe.space/9wih8cCeGbwoNA2Aw7sS/media/e8cdb38e-e38e-4b8a-b9ad-6e2ba62ca829.png";
 
   try {
       // Convert Logo URL to Base64
@@ -805,6 +805,27 @@ async function downloadPDF() {
 
       currentY += 20;
 
+      // Add a new page for Charts
+      doc.addPage();
+      doc.setFontSize(12);
+      doc.text("Retirement Fund Charts", 10, 20);
+
+      // Get Chart Images
+      const balanceChartCanvas = document.getElementById("balanceChart");
+      const incomeWithdrawalChartCanvas = document.getElementById("incomeWithdrawalChart");
+
+      if (balanceChartCanvas && incomeWithdrawalChartCanvas) {
+          const balanceChartImg = balanceChartCanvas.toDataURL("image/png");
+          const incomeWithdrawalChartImg = incomeWithdrawalChartCanvas.toDataURL("image/png");
+
+          // Add Balance Chart to PDF
+          doc.addImage(balanceChartImg, "PNG", 10, 30, 180, 70);
+          doc.addPage(); // New page for second chart
+
+          // Add Income vs. Withdrawal Chart to PDF
+          doc.addImage(incomeWithdrawalChartImg, "PNG", 10, 20, 180, 70);
+      }
+
       // Add a new page for the balance table
       doc.addPage();
       doc.setFontSize(12);
@@ -866,7 +887,7 @@ async function downloadPDF() {
       doc.save("retirement_calculation_results.pdf");
 
   } catch (error) {
-      console.error("Error loading logo:", error);
+      console.error("Error loading logo or charts:", error);
   }
 }
 
@@ -880,6 +901,7 @@ async function getBase64FromUrl(url) {
       reader.readAsDataURL(blob);
   });
 }
+
 
 
 // Initialize the calculator when the document is ready
