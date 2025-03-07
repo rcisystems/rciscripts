@@ -791,19 +791,32 @@ async function downloadPDF() {
 
       // Add Progress Bar
       let progress = (inputs.currentBalance / inputs.desiredIncome) * 100;
-      progress = Math.min(progress, 100);
+      progress = Math.min(progress, 100); // Cap at 100%
 
+      console.log(`Progress Calculation: ${progress.toFixed(2)}%`); // Debugging log
+
+      // Draw Background Bar
       doc.setFillColor(brandColors.light);
-      doc.rect(10, currentY, 190, 10, "F"); // Background Bar
+      doc.rect(10, currentY, 190, 10, "F"); 
 
-      doc.setFillColor(progress < 50 ? "#e74c3c" : progress < 80 ? "#f39c12" : "#2ecc71"); // Red, Orange, Green
+      // Determine the Fill Color (Same as Website)
+      let progressColor = "#2ecc71"; // Default Green
+      if (progress < 50) {
+          progressColor = "#e74c3c"; // Red for low progress
+      } else if (progress < 80) {
+          progressColor = "#f39c12"; // Orange for mid progress
+      }
+
+      // Draw Filled Progress Bar
+      doc.setFillColor(progressColor);
       doc.rect(10, currentY, (190 * progress) / 100, 10, "F");
 
+      // Add Progress Percentage Text in the Center
       doc.setTextColor(brandColors.primary);
       doc.setFontSize(10);
-      doc.text(`Savings Progress: ${progress.toFixed(2)}%`, 75, currentY + 7);
+      doc.text(`You have saved ${progress.toFixed(2)}% of your retirement goal.`, 60, currentY + 7);
 
-      currentY += 20;
+      currentY += 20; // Move down after progress bar
 
       // Add a new page for Charts
       doc.addPage();
