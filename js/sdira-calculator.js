@@ -853,7 +853,7 @@ async function downloadPDF(totalAmountNeeded) {
 
           // Reduce size to fit both charts on the same page
           const chartWidth = 180; // Chart width in PDF
-          const chartHeight = 60; // Reduced height to fit both on one page
+          const chartHeight = 100; // Reduced height to fit both on one page
 
           // Add Balance Chart
           doc.addImage(balanceChartImg, "PNG", 10, 30, chartWidth, chartHeight);
