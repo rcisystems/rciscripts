@@ -826,7 +826,7 @@ async function downloadPDF() {
           doc.addImage(incomeWithdrawalChartImg, "PNG", 10, 20, 180, 70);
       }
 
-      // Add a new page for the balance table
+      // Ensure the amortization schedule starts on a new page
       doc.addPage();
       doc.setFontSize(12);
       doc.setTextColor(brandColors.primary);
@@ -853,28 +853,32 @@ async function downloadPDF() {
               }
           }
 
-          doc.autoTable({
-              startY: 25,
-              head: [
-                  ["Age", "Income", "Balance", "Earnings", "Savings", "Withdrawal", "Ending Balance", "Rate (%)"],
-              ],
-              body: tableData,
-              theme: "grid",
-              headStyles: {
-                  fillColor: brandColors.secondary,
-                  textColor: brandColors.white,
-              },
-              bodyStyles: {
-                  textColor: brandColors.primary,
-              },
-              alternateRowStyles: {
-                  fillColor: brandColors.light,
-              },
-              styles: {
-                  fontSize: 8,
-              },
-              margin: { left: 10, right: 10 },
-          });
+          if (tableData.length > 0) {
+              doc.autoTable({
+                  startY: 25,
+                  head: [
+                      ["Age", "Income", "Balance", "Earnings", "Savings", "Withdrawal", "Ending Balance", "Rate (%)"],
+                  ],
+                  body: tableData,
+                  theme: "grid",
+                  headStyles: {
+                      fillColor: brandColors.secondary,
+                      textColor: brandColors.white,
+                  },
+                  bodyStyles: {
+                      textColor: brandColors.primary,
+                  },
+                  alternateRowStyles: {
+                      fillColor: brandColors.light,
+                  },
+                  styles: {
+                      fontSize: 8,
+                  },
+                  margin: { left: 10, right: 10 },
+              });
+          } else {
+              doc.text("No amortization data available.", 10, 30);
+          }
       }
 
       // Footer
@@ -901,6 +905,7 @@ async function getBase64FromUrl(url) {
       reader.readAsDataURL(blob);
   });
 }
+
 
 
 
