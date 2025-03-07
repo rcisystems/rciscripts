@@ -714,8 +714,7 @@ function showFormPopup() {
 }
 
 async function downloadPDF() {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
+  const doc = new window.jspdf.jsPDF();
 
   console.log("Starting PDF generation...");
 
@@ -769,6 +768,12 @@ async function downloadPDF() {
       const inputs = getInputs();
       console.log("Inputs Collected:", inputs);
 
+      if (typeof doc.autoTable !== "function") {
+        console.error("jspdf-autotable plugin is missing!");
+        alert("Error: The PDF export is missing the required table plugin. Please check the script includes.");
+        return;
+      }
+      
       // Summary Table
       doc.autoTable({
           startY: 60,
