@@ -743,7 +743,7 @@ async function downloadPDF(totalAmountNeeded) {
   };
 
   // Updated Logo URL
-  const logoUrl = "https://storage.googleapis.com/msgsndr/9wih8cCeGbwoNA2Aw7sS/media/6516057e5cf2e9e6e5680f92.png";
+  const logoUrl = "https://storage.googleapis.com/msgsndr/9wih8cCeGbwoNA2Aw7sS/media/65160598bfbfe07049a3bdfb.png";
 
   try {
       // Convert Logo URL to Base64
@@ -838,7 +838,7 @@ async function downloadPDF(totalAmountNeeded) {
 
       currentY += 20; // Move down after progress bar
 
-      // Add a new page for Charts
+      // Add Charts to the Same Page
       doc.addPage();
       doc.setFontSize(12);
       doc.text("Retirement Fund Charts", 10, 20);
@@ -851,12 +851,15 @@ async function downloadPDF(totalAmountNeeded) {
           const balanceChartImg = balanceChartCanvas.toDataURL("image/png");
           const incomeWithdrawalChartImg = incomeWithdrawalChartCanvas.toDataURL("image/png");
 
-          // Add Balance Chart to PDF
-          doc.addImage(balanceChartImg, "PNG", 10, 30, 180, 70);
-          // doc.addPage(); // New page for second chart
+          // Reduce size to fit both charts on the same page
+          const chartWidth = 180; // Chart width in PDF
+          const chartHeight = 60; // Reduced height to fit both on one page
 
-          // Add Income vs. Withdrawal Chart to PDF
-          doc.addImage(incomeWithdrawalChartImg, "PNG", 10, 20, 180, 70);
+          // Add Balance Chart
+          doc.addImage(balanceChartImg, "PNG", 10, 30, chartWidth, chartHeight);
+          
+          // Add Income vs. Withdrawal Chart below it
+          doc.addImage(incomeWithdrawalChartImg, "PNG", 10, 95, chartWidth, chartHeight);
       }
 
       console.log("Amortization Table Found.");
