@@ -826,7 +826,7 @@ async function downloadPDF() {
           doc.addImage(incomeWithdrawalChartImg, "PNG", 10, 20, 180, 70);
       }
 
-      // Ensure the amortization schedule starts on a new page
+      // Ensure amortization table starts on a new page
       doc.addPage();
       doc.setFontSize(12);
       doc.setTextColor(brandColors.primary);
@@ -905,6 +905,7 @@ async function getBase64FromUrl(url) {
       reader.readAsDataURL(blob);
   });
 }
+
 
 
 
