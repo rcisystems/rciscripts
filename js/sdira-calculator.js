@@ -718,23 +718,35 @@ async function downloadPDF() {
 
   console.log("Starting PDF generation...");
 
-  // Check if autoTable is available
-  if (typeof doc.autoTable !== "function") {
-      console.error("jspdf-autotable plugin is missing!");
-      alert("Error: The PDF export is missing the required table plugin. Please check the script includes.");
+  // Ensure the amortization table is fully generated before proceeding
+  const scheduleTable = document.getElementById("amortization-schedule");
+  if (!scheduleTable) {
+      console.error("Error: Amortization table not found in DOM.");
+      alert("The amortization table is missing. Please run the calculation first.");
+      return;
+  }
+
+  console.log("Amortization Table Found.");
+
+  const rows = scheduleTable.getElementsByTagName("tr");
+  console.log(`Total Rows Found in Table: ${rows.length}`);
+
+  if (rows.length <= 1) {
+      console.error("Error: No data rows found in the amortization table.");
+      alert("The amortization table is empty. Run a calculation before exporting.");
       return;
   }
 
   // Brand Colors
   const brandColors = {
-      primary: "#0E1F47",  
-      secondary: "#B8864B", 
-      highlight: "#D6AE5C", 
-      light: "#E6E0D5",     
+      primary: "#0E1F47",  // Dark Navy
+      secondary: "#B8864B", // Brown-Gold
+      highlight: "#D6AE5C", // Gold
+      light: "#E6E0D5",     // Beige
       white: "#FFFFFF"
   };
 
-  // Logo URL
+  // Updated Logo URL
   const logoUrl = "https://storage.googleapis.com/msgsndr/9wih8cCeGbwoNA2Aw7sS/media/6516057e5cf2e9e6e5680f92.png";
 
   try {
@@ -755,6 +767,12 @@ async function downloadPDF() {
       console.log("Collecting inputs...");
       const inputs = getInputs();
       console.log("Inputs Collected:", inputs);
+
+      if (typeof doc.autoTable !== "function") {
+        console.error("jspdf-autotable plugin is missing!");
+        alert("Error: The PDF export is missing the required table plugin. Please check the script includes.");
+        return;
+      }
 
       // Summary Table
       doc.autoTable({
@@ -789,96 +807,70 @@ async function downloadPDF() {
       let progress = (inputs.currentBalance / inputs.desiredIncome) * 100;
       progress = Math.min(progress, 100); // Cap at 100%
 
-      console.log(`Progress Calculation: ${progress.toFixed(2)}%`);
+      console.log(`Progress Calculation: ${progress.toFixed(2)}%`); // Debugging log
 
       // Draw Background Bar
       doc.setFillColor(brandColors.light);
       doc.rect(10, currentY, 190, 10, "F"); 
 
-      // Determine Fill Color
+      // Determine the Fill Color (Same as Website)
       let progressColor = "#2ecc71"; // Default Green
       if (progress < 50) {
-          progressColor = "#e74c3c"; // Red
+          progressColor = "#e74c3c"; // Red for low progress
       } else if (progress < 80) {
-          progressColor = "#f39c12"; // Orange
+          progressColor = "#f39c12"; // Orange for mid progress
       }
 
       // Draw Filled Progress Bar
       doc.setFillColor(progressColor);
       doc.rect(10, currentY, (190 * progress) / 100, 10, "F");
 
-      // Add Progress Percentage Text
+      // Add Progress Percentage Text in the Center
       doc.setTextColor(brandColors.primary);
       doc.setFontSize(10);
       doc.text(`You have saved ${progress.toFixed(2)}% of your retirement goal.`, 60, currentY + 7);
 
-      currentY += 20;
+      currentY += 20; // Move down after progress bar
 
-      // Add Charts
-      doc.addPage();
-      doc.setFontSize(12);
-      doc.text("Retirement Fund Charts", 10, 20);
-
-      // Get Chart Images
-      const balanceChartCanvas = document.getElementById("balanceChart");
-      const incomeWithdrawalChartCanvas = document.getElementById("incomeWithdrawalChart");
-
-      if (balanceChartCanvas && incomeWithdrawalChartCanvas) {
-          const balanceChartImg = balanceChartCanvas.toDataURL("image/png");
-          const incomeWithdrawalChartImg = incomeWithdrawalChartCanvas.toDataURL("image/png");
-
-          doc.addImage(balanceChartImg, "PNG", 10, 30, 180, 70);
-          doc.addPage();
-          doc.addImage(incomeWithdrawalChartImg, "PNG", 10, 20, 180, 70);
-      }
-
-      // Add Amortization Table
-      doc.addPage();
-      doc.setFontSize(12);
-      doc.setTextColor(brandColors.primary);
-      doc.text("Retirement Fund Projection", 10, 20);
-
-      // Get Amortization Table
-      const scheduleTable = document.getElementById("amortization-schedule");
-      if (!scheduleTable) {
-          console.error("Error: Amortization table not found in DOM.");
-          alert("The amortization table is missing. Please run the calculation first.");
-          return;
-      }
-
-      console.log("Amortization Table Found.");
-
-      const rows = scheduleTable.getElementsByTagName("tr");
-      console.log(`Total Rows Found in Table: ${rows.length}`);
-
-      if (rows.length <= 1) {
-          console.error("Error: No data rows found in the amortization table.");
-          alert("The amortization table is empty. Run a calculation before exporting.");
-          return;
-      }
+      // Extract and Log Table Data
+      console.log("Extracting Amortization Table...");
 
       let tableData = [];
       for (let i = 1; i < rows.length; i++) {
           const cells = rows[i].getElementsByTagName("td");
           if (cells.length > 0) {
               tableData.push([
-                  cells[0].innerText, 
-                  cells[1].innerText, 
-                  cells[2].innerText, 
-                  cells[3].innerText, 
-                  cells[4].innerText, 
-                  cells[5].innerText, 
-                  cells[6].innerText, 
-                  cells[7].innerText, 
+                  cells[0].innerText, // Age
+                  cells[1].innerText, // Yearly Income
+                  cells[2].innerText, // Beginning Balance
+                  cells[3].innerText, // Earnings
+                  cells[4].innerText, // Annual Savings
+                  cells[5].innerText, // Annual Withdrawal
+                  cells[6].innerText, // Ending Balance
+                  cells[7].innerText, // Withdrawal Rate
               ]);
           }
       }
 
       console.log("Extracted Data for Amortization Table:", tableData);
 
+      if (tableData.length === 0) {
+          console.error("No data found in amortization table.");
+          alert("The amortization table is empty. Run a calculation before exporting.");
+          return;
+      }
+
+      // Ensure amortization table starts on a new page
+      doc.addPage();
+      doc.setFontSize(12);
+      doc.setTextColor(brandColors.primary);
+      doc.text("Retirement Fund Projection", 10, 20);
+
       doc.autoTable({
           startY: 25,
-          head: [["Age", "Income", "Balance", "Earnings", "Savings", "Withdrawal", "Ending Balance", "Rate (%)"]],
+          head: [
+              ["Age", "Income", "Balance", "Earnings", "Savings", "Withdrawal", "Ending Balance", "Rate (%)"],
+          ],
           body: tableData,
           theme: "grid",
           headStyles: { fillColor: brandColors.secondary, textColor: brandColors.white },
@@ -890,7 +882,13 @@ async function downloadPDF() {
 
       console.log("Amortization Table Successfully Added to PDF.");
 
-      // Save PDF
+      // Footer
+      doc.setFontSize(10);
+      doc.setTextColor(brandColors.secondary);
+      doc.text("Rise Capital Investments - Smart Retirement Planning", 60, 290);
+      doc.line(10, 285, 200, 285);
+
+      // Save the PDF
       console.log("Saving PDF...");
       doc.save("retirement_calculation_results.pdf");
       console.log("PDF Saved Successfully.");
@@ -899,7 +897,6 @@ async function downloadPDF() {
       console.error("Error generating PDF:", error);
   }
 }
-
 
 // Helper function to fetch and convert logo URL to Base64
 async function getBase64FromUrl(url) {
