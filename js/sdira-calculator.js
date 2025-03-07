@@ -368,25 +368,45 @@ function recalculateWithRecommendedAge(recommendedAge) {
 }
 
 function updateSummary(
-    inputs,
-    runOutOfMoneyAge,
-    isSelfSustaining,
-    recommendedAge,
-    totalAmountNeeded
-  ) {
+  inputs,
+  runOutOfMoneyAge,
+  isSelfSustaining,
+  recommendedAge,
+  totalAmountNeeded
+) {
     const summaryDiv = document.getElementById("summary");
     summaryDiv.innerHTML = `
-          <p><strong>Plan Sustainability:</strong> ${
-            isSelfSustaining ? "Sustainable" : "Unsustainable"
-          }</p>
-          <p><strong>Run Out of Money Age:</strong> ${
-            runOutOfMoneyAge || "Never"
-          }</p>
-          <p><strong>Recommended Retirement Age:</strong> ${recommendedAge}</p>
-          <p><strong>Total Amount Needed for Retirement:</strong> $${totalAmountNeeded.toLocaleString()}</p>
-          <p><strong>After Retirement Income:</strong> $${inputs.afterRetIncome.toLocaleString()}</p>
-      `;
-  }
+        <p><strong>Plan Sustainability:</strong> ${
+          isSelfSustaining ? "Sustainable" : "Unsustainable"
+        }</p>
+        <p><strong>Run Out of Money Age:</strong> ${
+          runOutOfMoneyAge || "Never"
+        }</p>
+        <p><strong>Recommended Retirement Age:</strong> ${recommendedAge}</p>
+        <p><strong>Total Amount Needed for Retirement:</strong> $${totalAmountNeeded.toLocaleString()}</p>
+    `;
+
+    // Calculate progress toward retirement goal
+    let progressPercentage = (inputs.currentBalance / totalAmountNeeded) * 100;
+    progressPercentage = Math.min(progressPercentage, 100); // Cap at 100%
+
+    // Update Progress Bar
+    const progressBarFill = document.getElementById("progress-bar-fill");
+    const progressText = document.getElementById("progress-text");
+
+    progressBarFill.style.width = `${progressPercentage}%`;
+    progressText.innerText = `You have saved ${progressPercentage.toFixed(2)}% of your retirement goal.`;
+
+    // Change progress bar color based on progress
+    if (progressPercentage < 50) {
+        progressBarFill.style.backgroundColor = "#e74c3c"; // Red (low progress)
+    } else if (progressPercentage < 80) {
+        progressBarFill.style.backgroundColor = "#f39c12"; // Orange (moderate progress)
+    } else {
+        progressBarFill.style.backgroundColor = "#2ecc71"; // Green (good progress)
+    }
+}
+
 
   // Array to store saved scenarios
 let savedScenarios = [];
