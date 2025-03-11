@@ -55,22 +55,13 @@ function calculateScore() {
     console.log("Asset Variety Selected Inputs:", assetVarietyInputs);
     console.log("Risk Correlation Selected Inputs:", riskCorrelationInputs);
 
-    sectionScores.assetVariety = [...assetVarietyInputs].reduce((sum, input) => {
-        let value = parseInt(input.value || "0");
-        console.log(`Adding ${value} to Asset Variety`);
-        return sum + value;
-    }, 0);
-    
-    sectionScores.riskCorrelation = [...riskCorrelationInputs].reduce((sum, input) => {
-        let value = parseInt(input.value || "0");
-        console.log(`Adding ${value} to Risk Correlation`);
-        return sum + value;
-    }, 0);
+    sectionScores.assetVariety = [...assetVarietyInputs].reduce((sum, input) => sum + parseInt(input.value || "0"), 0);
+    sectionScores.riskCorrelation = [...riskCorrelationInputs].reduce((sum, input) => sum + parseInt(input.value || "0"), 0);
     
     console.log("Final Asset Variety Score: ", sectionScores.assetVariety);
     console.log("Final Risk Correlation Score: ", sectionScores.riskCorrelation);
     
-    // Ensure scores are valid
+    // Validate scores
     if (isNaN(sectionScores.assetVariety) || isNaN(sectionScores.riskCorrelation)) {
         console.error("Error: Invalid score detected. Resetting scores to 0.");
         sectionScores.assetVariety = 0;
@@ -79,17 +70,13 @@ function calculateScore() {
 
     totalScore = sectionScores.assetVariety + sectionScores.riskCorrelation;
     let totalPercentage = (totalScore / maxTotalScore) * 100;
+    
     console.log("Total Score: ", totalScore);
     console.log("Total Percentage: ", totalPercentage.toFixed(1) + "%");
 
-    let resultText = "";
-    if (totalPercentage >= 80) {
-        resultText = "True Diversification – You’re Ahead of the Game!";
-    } else if (totalPercentage >= 50) {
-        resultText = "Moderately Diversified – But You Have Gaps.";
-    } else {
-        resultText = "Portfolio Illusion – You’re Not Diversified, Just Overexposed.";
-    }
+    let resultText = totalPercentage >= 80 ? "True Diversification – You’re Ahead of the Game!" :
+                     totalPercentage >= 50 ? "Moderately Diversified – But You Have Gaps." :
+                     "Portfolio Illusion – You’re Not Diversified, Just Overexposed.";
     
     document.getElementById("result").innerHTML = `
         <h3 style="margin-bottom: 15px;">Your Overall Score: ${totalScore} / ${maxTotalScore} (${totalPercentage.toFixed(1)}%)</h3>
