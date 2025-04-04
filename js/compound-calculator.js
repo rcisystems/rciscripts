@@ -75,6 +75,7 @@ function calculateCompound() {
 
   document.getElementById("summary").style.display = "block";
   document.querySelector(".charts-container").style.display = "block";
+  document.getElementById("comparison-section").style.display = "block";
   const amortTable = document.getElementById("amortization-schedule");
   amortTable.style.opacity = 0;
   amortTable.style.display = "table";
@@ -85,6 +86,40 @@ function calculateCompound() {
   renderChart(data);
   showDownloadButton(data);
   showCSVExportButton(data);
+}
+
+function compareScenarios(scenarios) {
+  const container = document.getElementById("comparison-results");
+  const section = document.getElementById("comparison-section");
+  section.style.display = "block";
+
+  let html = '<table><thead><tr><th>Scenario</th><th>Final Balance</th><th>Total Interest</th><th>IRR</th><th>CAGR</th><th>APY</th></tr></thead><tbody>';
+
+  scenarios.forEach(({ name, principal, monthly, months, rate, frequency }) => {
+    const compoundingsPerYear = frequency;
+    const tYears = months / 12;
+    const maturity = frequency > 0
+      ? principal * Math.pow(1 + rate / 100 / compoundingsPerYear, compoundingsPerYear * tYears)
+      : principal;
+
+    const totalInterest = maturity - principal;
+    const totalInvested = principal + (monthly * months);
+    const irr = computeIRR(principal, monthly, months, maturity);
+    const CAGR = Math.pow(maturity / totalInvested, 1 / tYears) - 1;
+    const APY = (Math.pow(1 + (rate / 100) / compoundingsPerYear, compoundingsPerYear) - 1) * 100;
+
+    html += `<tr>
+      <td>${name}</td>
+      <td>$${maturity.toFixed(2)}</td>
+      <td>$${totalInterest.toFixed(2)}</td>
+      <td>${(irr * 100).toFixed(2)}%</td>
+      <td>${(CAGR * 100).toFixed(2)}%</td>
+      <td>${APY.toFixed(4)}%</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
 }
 
 function updateSummary(finalBalance, totalInterest, irr, CAGR) {
@@ -252,6 +287,12 @@ function downloadPDF() {
 
   doc.save("compound_interest.pdf");
 }
+
+compareScenarios([
+  { name: "Monthly", principal: 10000, monthly: 0, months: 12, rate: 10, frequency: 12 },
+  { name: "Quarterly", principal: 10000, monthly: 0, months: 12, rate: 10, frequency: 4 },
+  { name: "Annually", principal: 10000, monthly: 0, months: 12, rate: 10, frequency: 1 }
+]);
 
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Compound Calculator Loaded");
