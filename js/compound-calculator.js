@@ -193,7 +193,10 @@ function renderTable(data) {
 
 function renderChart(data) {
   const ctx = document.getElementById("balanceChart").getContext("2d");
-  if (window.compChart) window.compChart.destroy();
+
+  if (window.compChart) {
+    window.compChart.destroy();
+  }
 
   window.compChart = new Chart(ctx, {
     type: "line",
@@ -202,9 +205,10 @@ function renderChart(data) {
       datasets: [{
         label: "Balance Over Time",
         data: data.map(row => row.balance),
-        borderColor: "#b5833c",
-        backgroundColor: "rgba(181, 131, 60, 0.2)",
+        borderColor: "#4a90e2",
+        backgroundColor: "rgba(74, 144, 226, 0.2)",
         fill: true,
+        tension: 0.3
       }]
     },
     options: {
@@ -227,6 +231,7 @@ function renderChart(data) {
     }
   });
 }
+
 
 function resetCompoundForm() {
   document.getElementById("compound-calculator").reset();
