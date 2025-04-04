@@ -1,5 +1,10 @@
 // compound-calculator.js
 function calculateCompound() {
+  const monthsField = document.getElementById("months");
+  if (!monthsField) {
+    alert("Form is not ready yet. Please reload the page.");
+    return;
+  }
   const principal = parseFloat(document.getElementById("principal").value);
   const monthly = parseFloat(document.getElementById("monthly").value);
   const months = parseInt(document.getElementById("months").value);
