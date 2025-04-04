@@ -41,11 +41,16 @@ function calculateCompound() {
 
   document.getElementById("summary").style.display = "block";
   document.querySelector(".charts-container").style.display = "block";
+  const amortTable = document.getElementById("amortization-schedule");
+  amortTable.style.opacity = 0;
+  amortTable.style.display = "table";
+  setTimeout(() => { amortTable.style.transition = "opacity 0.5s"; amortTable.style.opacity = 1; }, 10);
 
   updateSummary(balance, totalInterest, irr, CAGR);
   renderTable(data);
   renderChart(data);
   showDownloadButton(data);
+  showCSVExportButton(data);
 }
 
 function updateSummary(finalBalance, totalInterest, irr, CAGR) {
@@ -148,6 +153,7 @@ function resetCompoundForm() {
   document.getElementById("summary").innerHTML = "";
   document.getElementById("summary").style.display = "none";
   document.getElementById("amortization-schedule").innerHTML = "";
+  document.getElementById("amortization-schedule").style.display = "none";
   document.getElementById("pdf-download-container").innerHTML = "";
   document.querySelector(".charts-container").style.display = "none";
   if (window.compChart) window.compChart.destroy();
@@ -156,8 +162,29 @@ function resetCompoundForm() {
 function showDownloadButton(data) {
   const container = document.getElementById("pdf-download-container");
   container.innerHTML = `<button onclick="downloadPDF()">Download PDF</button>`;
-
   window.compoundData = data;
+}
+
+function showCSVExportButton(data) {
+  const container = document.getElementById("pdf-download-container");
+  const csvButton = document.createElement("button");
+  csvButton.textContent = "Export CSV";
+  csvButton.onclick = () => downloadCSV(data);
+  container.appendChild(csvButton);
+}
+
+function downloadCSV(data) {
+  const csvRows = ["Period,Deposit,Interest,Balance"];
+  data.forEach(row => {
+    csvRows.push(`${row.label},${row.deposit.toFixed(2)},${row.interest.toFixed(2)},${row.balance.toFixed(2)}`);
+  });
+  const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "compound_interest.csv";
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function downloadPDF() {
