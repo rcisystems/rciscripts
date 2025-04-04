@@ -53,7 +53,7 @@ function calculateCompound() {
         deposit: deposit
       });
     }
-}
+  }
 
   const totalInvested = principal + (monthly * months);
   const irr = computeIRR(principal, monthly, months, balance);
@@ -61,7 +61,6 @@ function calculateCompound() {
 
   document.getElementById("summary").style.display = "block";
   document.querySelector(".charts-container").style.display = "block";
-  document.getElementById("comparison-section").style.display = "block";
   const amortTable = document.getElementById("amortization-schedule");
   amortTable.style.opacity = 0;
   amortTable.style.display = "table";
