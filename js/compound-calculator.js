@@ -44,7 +44,7 @@ function calculateCompound() {
       balance += interest + deposit;
       totalInterest += interest;
 
-      const label = getPeriodLabel(i, frequency);
+      const label = getPeriodLabel(i, 12); // Always use 'Month' labels
 
       data.push({
         label,
