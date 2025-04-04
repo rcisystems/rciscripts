@@ -1,4 +1,17 @@
 // compound-calculator.js
+function getPeriodLabel(index, frequency) {
+  const unit = {
+    365: 'Day',
+    52: 'Week',
+    12: 'Month',
+    4: 'Quarter',
+    2: 'Half-Year',
+    1: 'Year',
+    0: 'Period'
+  }[frequency] || 'Period';
+  return `${unit} ${index}`;
+}
+
 function calculateCompound() {
   const fields = ["principal", "monthly", "months", "rate", "compound", "granularity"];
   for (const id of fields) {
@@ -22,7 +35,6 @@ function calculateCompound() {
   const data = [];
   let totalInterest = 0;
 
-  // Apply compound interest formula only once for principal with no monthly deposits
   if (monthly === 0) {
     const compoundingsPerYear = frequency;
     const tYears = months / 12;
@@ -32,7 +44,7 @@ function calculateCompound() {
     totalInterest = maturity - principal;
     balance = maturity;
     data.push({
-      label: `Month ${months}`,
+      label: getPeriodLabel(months, frequency),
       deposit: 0,
       interest: totalInterest,
       balance: balance
@@ -46,9 +58,7 @@ function calculateCompound() {
       balance += interest + deposit;
       totalInterest += interest;
 
-      const label = granularity === "monthly"
-        ? `Month ${i}`
-        : `Period ${i}`;
+      const label = getPeriodLabel(i, frequency);
 
       data.push({
         label,
