@@ -22,24 +22,41 @@ function calculateCompound() {
   const data = [];
   let totalInterest = 0;
 
-  for (let i = 1; i <= totalPeriods; i++) {
-    const isDepositMonth = granularity === "monthly" || (i % Math.floor(frequency / 12) === 0);
-    const deposit = isDepositMonth ? monthly : 0;
-    const interest = frequency > 0 ? balance * periodRate : 0;
-
-    balance += interest + deposit;
-    totalInterest += interest;
-
-    const label = granularity === "monthly"
-      ? `Month ${i}`
-      : `Period ${i}`;
-
+  // Apply compound interest formula only once for principal with no monthly deposits
+  if (monthly === 0) {
+    const compoundingsPerYear = frequency;
+    const tYears = months / 12;
+    const maturity = frequency > 0
+      ? principal * Math.pow(1 + rate / compoundingsPerYear, compoundingsPerYear * tYears)
+      : principal;
+    totalInterest = maturity - principal;
+    balance = maturity;
     data.push({
-      label,
-      balance: balance,
-      interest: interest,
-      deposit: deposit
+      label: `Month ${months}`,
+      deposit: 0,
+      interest: totalInterest,
+      balance: balance
     });
+  } else {
+    for (let i = 1; i <= totalPeriods; i++) {
+      const isDepositMonth = granularity === "monthly" || (i % Math.floor(frequency / 12) === 0);
+      const deposit = isDepositMonth ? monthly : 0;
+      const interest = frequency > 0 ? balance * periodRate : 0;
+
+      balance += interest + deposit;
+      totalInterest += interest;
+
+      const label = granularity === "monthly"
+        ? `Month ${i}`
+        : `Period ${i}`;
+
+      data.push({
+        label,
+        balance: balance,
+        interest: interest,
+        deposit: deposit
+      });
+    }
   }
 
   const totalInvested = principal + (monthly * months);
@@ -62,11 +79,22 @@ function calculateCompound() {
 
 function updateSummary(finalBalance, totalInterest, irr, CAGR) {
   const summary = document.getElementById("summary");
+  const months = parseFloat(document.getElementById("months").value);
+  const apy = ((1 + (totalInterest / (finalBalance - totalInterest))) ** (12 / months) - 1) * 100;
+  const formulaNote = "Formula used: A = P(1 + r/n)<sup>nt</sup>";
   summary.innerHTML = `
-    <p><strong>Final Balance:</strong> $${finalBalance.toFixed(2)}</p>
-    <p><strong>Total Interest Earned:</strong> $${totalInterest.toFixed(2)}</p>
-    <p><strong>Estimated IRR:</strong> ${(irr * 100).toFixed(2)}%</p>
-    <p><strong>Compounded Annual Growth Rate (CAGR):</strong> ${(CAGR * 100).toFixed(2)}%</p>
+    <style>
+      .info-icon {
+        cursor: help;
+        border-bottom: 1px dotted #000;
+      }
+    </style>
+    <p><strong>Final Balance:</strong> <span class="info-icon" title="This is your ending balance after all deposits and interest are applied.">[?]</span> $${finalBalance.toFixed(2)}</p>
+    <p><strong>Total Interest Earned:</strong> <span class="info-icon" title="Total amount of interest earned over the entire investment period.">[?]</span> $${totalInterest.toFixed(2)}</p>
+    <p><strong>Estimated IRR:</strong> <span class="info-icon" title="Internal Rate of Return: Annualized return considering all cash flows.">[?]</span> ${(irr * 100).toFixed(2)}%</p>
+    <p><strong>Compounded Annual Growth Rate (CAGR):</strong> <span class="info-icon" title="Average annual return assuming steady growth from start to end balance.">[?]</span> ${(CAGR * 100).toFixed(2)}%</p>
+    <p><strong>APY:</strong> <span class="info-icon" title="Annual Percentage Yield: Total effective yield based on compound interest.">[?]</span> ${apy.toFixed(4)}%</p>
+    <p><em>${formulaNote}</em></p>
   `;
 }
 
