@@ -2,12 +2,12 @@
 function calculateCompound() {
   const principal = parseFloat(document.getElementById("principal").value);
   const monthly = parseFloat(document.getElementById("monthly").value);
-  const years = parseInt(document.getElementById("years").value);
+  const months = parseInt(document.getElementById("months").value);
   const rate = parseFloat(document.getElementById("rate").value) / 100;
   const frequency = parseInt(document.getElementById("compound").value);
   const granularity = document.getElementById("granularity").value;
 
-  const totalPeriods = years * (granularity === "monthly" ? 12 : frequency);
+  const totalPeriods = months;
   const interval = granularity === "monthly" ? 12 : frequency;
   const periodRate = frequency > 0 ? rate / frequency : 0;
 
@@ -35,18 +35,52 @@ function calculateCompound() {
     });
   }
 
-  updateSummary(balance, totalInterest);
+  const totalInvested = principal + (monthly * months);
+  const irr = computeIRR(principal, monthly, months, balance);
+  const CAGR = Math.pow(balance / totalInvested, 12 / months) - 1;
+
+  document.getElementById("summary").style.display = "block";
+  document.querySelector(".charts-container").style.display = "block";
+
+  updateSummary(balance, totalInterest, irr, CAGR);
   renderTable(data);
   renderChart(data);
   showDownloadButton(data);
 }
 
-function updateSummary(finalBalance, totalInterest) {
+function updateSummary(finalBalance, totalInterest, irr, CAGR) {
   const summary = document.getElementById("summary");
   summary.innerHTML = `
     <p><strong>Final Balance:</strong> $${finalBalance.toFixed(2)}</p>
     <p><strong>Total Interest Earned:</strong> $${totalInterest.toFixed(2)}</p>
+    <p><strong>Estimated IRR:</strong> ${(irr * 100).toFixed(2)}%</p>
+    <p><strong>Compounded Annual Growth Rate (CAGR):</strong> ${(CAGR * 100).toFixed(2)}%</p>
   `;
+}
+
+function computeIRR(initial, monthly, months, finalValue, guess = 0.1) {
+  let rate = guess;
+  const maxIter = 1000;
+  const tol = 1e-6;
+
+  for (let iter = 0; iter < maxIter; iter++) {
+    let npv = -initial;
+    let dNpv = 0;
+
+    for (let i = 1; i <= months; i++) {
+      const df = Math.pow(1 + rate, i);
+      npv += monthly / df;
+      dNpv -= (i * monthly) / (df * (1 + rate));
+    }
+
+    npv += finalValue / Math.pow(1 + rate, months);
+    dNpv -= (months * finalValue) / (Math.pow(1 + rate, months + 1));
+
+    const newRate = rate - npv / dNpv;
+    if (Math.abs(newRate - rate) < tol) return newRate;
+    rate = newRate;
+  }
+  return rate;
 }
 
 function renderTable(data) {
@@ -112,8 +146,10 @@ function renderChart(data) {
 function resetCompoundForm() {
   document.getElementById("compound-calculator").reset();
   document.getElementById("summary").innerHTML = "";
+  document.getElementById("summary").style.display = "none";
   document.getElementById("amortization-schedule").innerHTML = "";
   document.getElementById("pdf-download-container").innerHTML = "";
+  document.querySelector(".charts-container").style.display = "none";
   if (window.compChart) window.compChart.destroy();
 }
 
