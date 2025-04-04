@@ -1,6 +1,12 @@
 // compound-calculator.js
 function calculateCompound() {
-  const monthsField = document.getElementById("months");
+  const fields = ["principal", "monthly", "months", "rate", "compound", "granularity"];
+  for (const id of fields) {
+    if (!document.getElementById(id)) {
+      alert(`Form element "${id}" not found. Please check your HTML.`);
+      return;
+    }
+  }
   if (!monthsField) {
     alert("Form is not ready yet. Please reload the page.");
     return;
