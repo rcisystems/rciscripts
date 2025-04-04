@@ -35,21 +35,25 @@ function calculateCompound() {
   const data = [];
   let totalInterest = 0;
 
-  if (monthly === 0) {
-    const compoundingsPerYear = frequency;
-    const tYears = months / 12;
-    const maturity = frequency > 0
-      ? principal * Math.pow(1 + rate / compoundingsPerYear, compoundingsPerYear * tYears)
-      : principal;
-    totalInterest = maturity - principal;
-    balance = maturity;
-    data.push({
-      label: getPeriodLabel(months, frequency),
-      deposit: 0,
-      interest: totalInterest,
-      balance: balance
-    });
-  } else {
+  if (months > 0) {
+    for (let i = 1; i <= totalPeriods; i++) {
+      const isDepositMonth = granularity === "monthly" || (i % Math.floor(frequency / 12) === 0);
+      const deposit = isDepositMonth ? monthly : 0;
+      const interest = frequency > 0 ? balance * periodRate : 0;
+
+      balance += interest + deposit;
+      totalInterest += interest;
+
+      const label = getPeriodLabel(i, frequency);
+
+      data.push({
+        label,
+        balance: balance,
+        interest: interest,
+        deposit: deposit
+      });
+    }
+  }
     for (let i = 1; i <= totalPeriods; i++) {
       const isDepositMonth = granularity === "monthly" || (i % Math.floor(frequency / 12) === 0);
       const deposit = isDepositMonth ? monthly : 0;
