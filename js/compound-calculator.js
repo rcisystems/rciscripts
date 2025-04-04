@@ -53,25 +53,7 @@ function calculateCompound() {
         deposit: deposit
       });
     }
-  }
-    for (let i = 1; i <= totalPeriods; i++) {
-      const isDepositMonth = granularity === "monthly" || (i % Math.floor(frequency / 12) === 0);
-      const deposit = isDepositMonth ? monthly : 0;
-      const interest = frequency > 0 ? balance * periodRate : 0;
-
-      balance += interest + deposit;
-      totalInterest += interest;
-
-      const label = getPeriodLabel(i, frequency);
-
-      data.push({
-        label,
-        balance: balance,
-        interest: interest,
-        deposit: deposit
-      });
-    }
-  }
+}
 
   const totalInvested = principal + (monthly * months);
   const irr = computeIRR(principal, monthly, months, balance);
