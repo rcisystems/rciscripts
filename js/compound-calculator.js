@@ -122,13 +122,19 @@ function updateSummary(finalBalance, totalInterest, irr, CAGR) {
   const principal = parseFloat(document.getElementById("principal").value);
   const monthly = parseFloat(document.getElementById("monthly").value);
   const months = parseInt(document.getElementById("months").value);
-  const rate = parseFloat(document.getElementById("rate").value) / 100;
+  const aprPercent = parseFloat(document.getElementById("rate").value);
+  const rate = aprPercent / 100;
   const frequency = parseInt(document.getElementById("compound").value);
+
+  const tYears = months / 12;
   const totalInvested = principal + (monthly * months);
 
-  // Accurate formulas
+  const maturity = frequency > 0
+    ? principal * Math.pow(1 + rate / frequency, frequency * tYears)
+    : principal;
+
   const apy = (Math.pow(1 + rate / frequency, frequency) - 1) * 100;
-  const correctedCAGR = Math.pow(finalBalance / totalInvested, 1 / (months / 12)) - 1;
+  const correctedCAGR = Math.pow(maturity / totalInvested, 1 / tYears) - 1;
 
   const formulaNote = "Formula used: A = P(1 + r/n)<sup>nt</sup>";
 
@@ -139,8 +145,8 @@ function updateSummary(finalBalance, totalInterest, irr, CAGR) {
         border-bottom: 1px dotted #000;
       }
     </style>
-    <p><strong>Final Balance:</strong> <span class="info-icon" title="Your ending balance after all deposits and interest.">[?]</span> $${finalBalance.toFixed(2)}</p>
-    <p><strong>Total Interest Earned:</strong> <span class="info-icon" title="Total interest earned over the entire investment period.">[?]</span> $${totalInterest.toFixed(2)}</p>
+    <p><strong>Final Balance:</strong> <span class="info-icon" title="Your ending balance after all deposits and interest.">[?]</span> $${maturity.toFixed(2)}</p>
+    <p><strong>Total Interest Earned:</strong> <span class="info-icon" title="Total interest earned over the entire investment period.">[?]</span> $${(maturity - totalInvested).toFixed(2)}</p>
     <p><strong>Estimated IRR:</strong> <span class="info-icon" title="Annualized return considering all deposits and cash flow.">[?]</span> ${(irr * 100).toFixed(2)}%</p>
     <p><strong>Compounded Annual Growth Rate (CAGR):</strong> <span class="info-icon" title="Smoothed annual return from start to final balance.">[?]</span> ${(correctedCAGR * 100).toFixed(2)}%</p>
     <p><strong>APY:</strong> <span class="info-icon" title="Annual Percentage Yield, based on compound frequency.">[?]</span> ${apy.toFixed(4)}%</p>
