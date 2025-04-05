@@ -44,15 +44,25 @@ function calculateCompound() {
       const isDepositMonth = granularity === "monthly" || (i % Math.floor(frequency / 12) === 0);
       const deposit = isDepositMonth ? monthly : 0;
       const isCompoundMonth = frequency > 0 && (i % Math.floor(12 / frequency) === 0);
-      const interest = isCompoundMonth ? balance * periodRate : 0;
+      let interest = 0;
+      if (mode === "compound") {
+        interest = isCompoundMonth ? balance * periodRate : 0;
+        balance += interest;
+      } else if (mode === "payout") {
+        interest = isPaymentMonth ? principal * periodRate : 0;
+        // balance remains unchanged in payout mode
+      }
 
-      balance += interest + deposit;
+      if (mode === "compound") balance += deposit;
+      else if (mode === "payout") balance = principal; // remain static in payout mode
+      else balance += deposit;
       totalInterest += interest;
 
       const label = getPeriodLabel(i, 12); // Always use 'Month' labels
 
       data.push({
         label,
+        paymentSchedule: isPaymentMonth ? granularity.charAt(0).toUpperCase() + granularity.slice(1) : '',
         paymentSchedule: isPaymentMonth ? granularity.charAt(0).toUpperCase() + granularity.slice(1) : '',
         balance: balance,
         interest: interest,
@@ -72,7 +82,7 @@ function calculateCompound() {
   amortTable.style.display = "table";
   setTimeout(() => { amortTable.style.transition = "opacity 0.5s"; amortTable.style.opacity = 1; }, 10);
 
-  updateSummary(balance, totalInterest, irr, CAGR);
+  updateSummary(mode === "compound" ? balance : principal, totalInterest, irr, CAGR);
   renderTable(data);
   renderChart(data);
   showDownloadButton(data);
