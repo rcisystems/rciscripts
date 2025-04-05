@@ -332,12 +332,6 @@ function downloadPDF() {
   doc.save("compound_interest.pdf");
 }
 
-compareScenarios([
-  { name: "Monthly", principal: 10000, monthly: 0, months: 12, rate: 10, frequency: 12 },
-  { name: "Quarterly", principal: 10000, monthly: 0, months: 12, rate: 10, frequency: 4 },
-  { name: "Annually", principal: 10000, monthly: 0, months: 12, rate: 10, frequency: 1 }
-]);
-
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Compound Calculator Loaded");
 });
