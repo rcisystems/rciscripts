@@ -20,54 +20,63 @@ function calculateCompound() {
       return;
     }
   }
+
   const principal = parseFloat(document.getElementById("principal").value);
   const monthly = parseFloat(document.getElementById("monthly").value);
   const months = parseInt(document.getElementById("months").value);
   const rate = parseFloat(document.getElementById("rate").value) / 100;
   const frequency = parseInt(document.getElementById("compound").value);
   const granularity = document.getElementById("granularity").value;
-  
-  const totalPeriods = months;
-  
-  const interval = granularity === "monthly" ? 12 : frequency;
-  const periodRate = frequency > 0 ? rate / frequency : 0;
+  const mode = granularity !== "none" ? "payout" : "compound";
 
+  const periodRate = frequency > 0 ? rate / frequency : 0;
   let balance = principal;
   const data = [];
   let totalInterest = 0;
 
   if (months > 0) {
-    for (let i = 1; i <= totalPeriods; i++) {
+    for (let i = 1; i <= months; i++) {
       const isPaymentMonth = granularity === "monthly" ||
         (granularity === "quarterly" && i % 3 === 0) ||
         (granularity === "semiannually" && i % 6 === 0) ||
         (granularity === "annually" && i % 12 === 0);
       const isDepositMonth = granularity === "monthly" || (i % Math.floor(frequency / 12) === 0);
-      const deposit = isDepositMonth ? monthly : 0;
       const isCompoundMonth = frequency > 0 && (i % Math.floor(12 / frequency) === 0);
+
+      const deposit = isDepositMonth ? monthly : 0;
       let interest = 0;
-      if (mode === "compound") {
-        interest = isCompoundMonth ? balance * periodRate : 0;
-        balance += interest;
-      } else if (mode === "payout") {
-        interest = isPaymentMonth ? principal * periodRate : 0;
-        // balance remains unchanged in payout mode
+      let payout = 0;
+
+      // Compound interest calculation
+      if (isCompoundMonth) {
+        interest = balance * periodRate;
+        if (mode === "compound" || (mode === "payout" && granularity === "annually")) {
+          balance += interest;
+        }
       }
 
-      if (mode === "compound") balance += deposit;
-      else if (mode === "payout") balance = principal; // remain static in payout mode
-      else balance += deposit;
+      balance += deposit;
       totalInterest += interest;
 
-      const label = getPeriodLabel(i, 12); // Always use 'Month' labels
+      // Payment schedule logic (only subtract balance if payout happens)
+      if (mode === "payout" && isPaymentMonth) {
+        payout = granularity === "annually"
+          ? (Math.pow(1 + rate / frequency, frequency * (months / 12)) * principal - principal)
+          : (principal * rate) / (
+              granularity === "monthly" ? 12 :
+              granularity === "quarterly" ? 4 :
+              granularity === "semiannually" ? 2 : 1);
+        // Do not subtract payout from balance — in interest-only mode, principal remains untouched
+      }
+
+      const label = getPeriodLabel(i, 12);
 
       data.push({
         label,
-        paymentSchedule: isPaymentMonth ? granularity.charAt(0).toUpperCase() + granularity.slice(1) : '',
-        paymentSchedule: isPaymentMonth ? granularity.charAt(0).toUpperCase() + granularity.slice(1) : '',
-        balance: balance,
-        interest: interest,
-        deposit: deposit
+        paymentSchedule: (mode === "payout" && isPaymentMonth) ? `$${payout.toFixed(2)}` : '',
+        deposit,
+        interest,
+        balance
       });
     }
   }
