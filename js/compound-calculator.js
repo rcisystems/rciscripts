@@ -26,6 +26,7 @@ function calculateCompound() {
   const rate = parseFloat(document.getElementById("rate").value) / 100;
   const frequency = parseInt(document.getElementById("compound").value);
   const granularity = document.getElementById("granularity").value;
+  const mode = granularity !== "none" ? "payout" : "compound";
 
   const totalPeriods = months;
   const interval = granularity === "monthly" ? 12 : frequency;
