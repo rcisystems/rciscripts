@@ -76,7 +76,17 @@ function calculateCompound() {
 function compareScenarios(scenarios) {
   const container = document.getElementById("comparison-results");
   const section = document.getElementById("comparison-section");
+  section.style.opacity = 0;
+  section.style.opacity = 0;
   section.style.display = "block";
+  setTimeout(() => {
+    section.style.transition = "opacity 0.5s ease";
+    section.style.opacity = 1;
+  }, 10);
+  setTimeout(() => {
+    section.style.transition = "opacity 0.5s";
+    section.style.opacity = 1;
+  }, 10);
 
   let html = '<table><thead><tr><th>Scenario</th><th>Final Balance</th><th>Total Interest</th><th>IRR</th><th>CAGR</th><th>APY</th></tr></thead><tbody>';
 
@@ -104,7 +114,7 @@ function compareScenarios(scenarios) {
   });
 
   html += '</tbody></table>';
-  container.innerHTML = html;
+  container.innerHTML = html + '<br><button onclick="hideComparison()">Hide Scenarios</button>';
 }
 
 function updateSummary(finalBalance, totalInterest, irr, CAGR) {
@@ -174,6 +184,13 @@ function renderTable(data) {
       </tr>
     `;
   });
+}
+
+function hideComparison() {
+  const section = document.getElementById("comparison-section");
+  section.style.transition = "opacity 0.5s ease";
+  section.style.opacity = 0;
+  setTimeout(() => section.style.display = "none", 500);
 }
 
 function renderChart(data) {
