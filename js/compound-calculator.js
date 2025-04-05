@@ -39,7 +39,8 @@ function calculateCompound() {
     for (let i = 1; i <= totalPeriods; i++) {
       const isDepositMonth = granularity === "monthly" || (i % Math.floor(frequency / 12) === 0);
       const deposit = isDepositMonth ? monthly : 0;
-      const interest = frequency > 0 ? balance * periodRate : 0;
+      const isCompoundMonth = frequency > 0 && (i % Math.floor(12 / frequency) === 0);
+      const interest = isCompoundMonth ? balance * periodRate : 0;
 
       balance += interest + deposit;
       totalInterest += interest;
