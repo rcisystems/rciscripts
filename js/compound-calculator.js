@@ -73,49 +73,49 @@ function calculateCompound() {
   showCSVExportButton(data);
 }
 
-function compareScenarios(scenarios) {
-  const container = document.getElementById("comparison-results");
-  const section = document.getElementById("comparison-section");
-  section.style.opacity = 0;
-  section.style.opacity = 0;
-  section.style.display = "block";
-  setTimeout(() => {
-    section.style.transition = "opacity 0.5s ease";
-    section.style.opacity = 1;
-  }, 10);
-  setTimeout(() => {
-    section.style.transition = "opacity 0.5s";
-    section.style.opacity = 1;
-  }, 10);
+// function compareScenarios(scenarios) {
+//   const container = document.getElementById("comparison-results");
+//   const section = document.getElementById("comparison-section");
+//   section.style.opacity = 0;
+//   section.style.opacity = 0;
+//   section.style.display = "block";
+//   setTimeout(() => {
+//     section.style.transition = "opacity 0.5s ease";
+//     section.style.opacity = 1;
+//   }, 10);
+//   setTimeout(() => {
+//     section.style.transition = "opacity 0.5s";
+//     section.style.opacity = 1;
+//   }, 10);
 
-  let html = '<table><thead><tr><th>Scenario</th><th>Final Balance</th><th>Total Interest</th><th>IRR</th><th>CAGR</th><th>APY</th></tr></thead><tbody>';
+//   let html = '<table><thead><tr><th>Scenario</th><th>Final Balance</th><th>Total Interest</th><th>IRR</th><th>CAGR</th><th>APY</th></tr></thead><tbody>';
 
-  scenarios.forEach(({ name, principal, monthly, months, rate, frequency }) => {
-    const compoundingsPerYear = frequency;
-    const tYears = months / 12;
-    const maturity = frequency > 0
-      ? principal * Math.pow(1 + rate / 100 / compoundingsPerYear, compoundingsPerYear * tYears)
-      : principal;
+//   scenarios.forEach(({ name, principal, monthly, months, rate, frequency }) => {
+//     const compoundingsPerYear = frequency;
+//     const tYears = months / 12;
+//     const maturity = frequency > 0
+//       ? principal * Math.pow(1 + rate / 100 / compoundingsPerYear, compoundingsPerYear * tYears)
+//       : principal;
 
-    const totalInterest = maturity - principal;
-    const totalInvested = principal + (monthly * months);
-    const irr = computeIRR(principal, monthly, months, maturity);
-    const CAGR = Math.pow(maturity / totalInvested, 1 / tYears) - 1;
-    const APY = (Math.pow(1 + (rate / 100) / compoundingsPerYear, compoundingsPerYear) - 1) * 100;
+//     const totalInterest = maturity - principal;
+//     const totalInvested = principal + (monthly * months);
+//     const irr = computeIRR(principal, monthly, months, maturity);
+//     const CAGR = Math.pow(maturity / totalInvested, 1 / tYears) - 1;
+//     const APY = (Math.pow(1 + (rate / 100) / compoundingsPerYear, compoundingsPerYear) - 1) * 100;
 
-    html += `<tr>
-      <td>${name}</td>
-      <td>$${maturity.toFixed(2)}</td>
-      <td>$${totalInterest.toFixed(2)}</td>
-      <td>${(irr * 100).toFixed(2)}%</td>
-      <td>${(CAGR * 100).toFixed(2)}%</td>
-      <td>${APY.toFixed(4)}%</td>
-    </tr>`;
-  });
+//     html += `<tr>
+//       <td>${name}</td>
+//       <td>$${maturity.toFixed(2)}</td>
+//       <td>$${totalInterest.toFixed(2)}</td>
+//       <td>${(irr * 100).toFixed(2)}%</td>
+//       <td>${(CAGR * 100).toFixed(2)}%</td>
+//       <td>${APY.toFixed(4)}%</td>
+//     </tr>`;
+//   });
 
-  html += '</tbody></table>';
-  container.innerHTML = html + '<br><button onclick="hideComparison()">Hide Scenarios</button>';
-}
+//   html += '</tbody></table>';
+//   container.innerHTML = html + '<br><button onclick="hideComparison()">Hide Scenarios</button>';
+// }
 
 function updateSummary(finalBalance, totalInterest, irr, CAGR) {
   const summary = document.getElementById("summary");
