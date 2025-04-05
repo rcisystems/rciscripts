@@ -29,6 +29,7 @@ function calculateCompound() {
   const mode = granularity !== "none" ? "payout" : "compound";
 
   const totalPeriods = months;
+  const mode = granularity !== "none" ? "payout" : "compound";
   const interval = granularity === "monthly" ? 12 : frequency;
   const periodRate = frequency > 0 ? rate / frequency : 0;
 
@@ -83,7 +84,7 @@ function calculateCompound() {
   amortTable.style.display = "table";
   setTimeout(() => { amortTable.style.transition = "opacity 0.5s"; amortTable.style.opacity = 1; }, 10);
 
-  updateSummary(mode === "compound" ? balance : principal, totalInterest, irr, CAGR);
+  updateSummary(balance, totalInterest, irr, CAGR);
   renderTable(data);
   renderChart(data);
   showDownloadButton(data);
