@@ -37,6 +37,10 @@ function calculateCompound() {
 
   if (months > 0) {
     for (let i = 1; i <= totalPeriods; i++) {
+      const isPaymentMonth = granularity === "monthly" ||
+        (granularity === "quarterly" && i % 3 === 0) ||
+        (granularity === "semiannually" && i % 6 === 0) ||
+        (granularity === "annually" && i % 12 === 0);
       const isDepositMonth = granularity === "monthly" || (i % Math.floor(frequency / 12) === 0);
       const deposit = isDepositMonth ? monthly : 0;
       const isCompoundMonth = frequency > 0 && (i % Math.floor(12 / frequency) === 0);
@@ -49,6 +53,7 @@ function calculateCompound() {
 
       data.push({
         label,
+        paymentSchedule: isPaymentMonth ? granularity.charAt(0).toUpperCase() + granularity.slice(1) : '',
         balance: balance,
         interest: interest,
         deposit: deposit
@@ -185,6 +190,7 @@ function renderTable(data) {
   table.innerHTML = `
     <tr>
       <th>Period</th>
+      <th>Payment Schedule</th>      
       <th>Deposit ($)</th>
       <th>Interest ($)</th>
       <th>Balance ($)</th>
@@ -195,6 +201,7 @@ function renderTable(data) {
     table.innerHTML += `
       <tr>
         <td>${row.label}</td>
+        <td>${row.paymentSchedule || ''}</td>
         <td>${row.deposit.toFixed(2)}</td>
         <td>${row.interest.toFixed(2)}</td>
         <td>${row.balance.toFixed(2)}</td>
