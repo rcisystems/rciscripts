@@ -30,6 +30,7 @@ function calculateCompound() {
 
   let mode = granularity !== "none" ? "payout" : "compound";
   const totalPeriods = months;
+  const mode = granularity !== "none" ? "payout" : "compound";
   const interval = granularity === "monthly" ? 12 : frequency;
   const periodRate = frequency > 0 ? rate / frequency : 0;
 
