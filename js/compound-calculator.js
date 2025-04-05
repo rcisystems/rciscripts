@@ -105,7 +105,7 @@ function updateSummary(finalBalance, totalInterest, irr, CAGR) {
     </style>
     <p><strong>Final Balance:</strong> <span class="info-icon" title="Your ending balance after all deposits and interest.">[?]</span> $${maturity.toFixed(2)}</p>
     <p><strong>Total Interest Earned:</strong> <span class="info-icon" title="Total interest earned over the entire investment period.">[?]</span> $${(maturity - totalInvested).toFixed(2)}</p>
-    <p><strong>Estimated IRR:</strong> <span class="info-icon" title="Annualized return considering all deposits and cash flow.">[?]</span> ${(irr * 100).toFixed(2)}%</p>
+    <p><strong>Estimated IRR (Annualized):</strong> <span class="info-icon" title="Annualized return considering all deposits and cash flow.">[?]</span> ${((Math.pow(1 + irr, 12) - 1) * 100).toFixed(2)}%</p>
     <p><strong>Compounded Annual Growth Rate (CAGR):</strong> <span class="info-icon" title="Smoothed annual return from start to final balance.">[?]</span> ${(correctedCAGR * 100).toFixed(2)}%</p>
     <p><strong>APY:</strong> <span class="info-icon" title="Annual Percentage Yield, based on compound frequency.">[?]</span> ${apy.toFixed(4)}%</p>
     <p><em>${formulaNote}</em></p>
