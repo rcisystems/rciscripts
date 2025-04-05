@@ -26,8 +26,6 @@ function calculateCompound() {
   const months = parseInt(document.getElementById("months").value);
   const rate = parseFloat(document.getElementById("rate").value) / 100;
   const frequency = parseInt(document.getElementById("compound").value);
-  // const granularity = document.getElementById("granularity").value;
-  // const mode = granularity !== "none" ? "payout" : "compound";
 
   const periodRate = frequency > 0 ? rate / frequency : 0;
   let balance = principal;
@@ -36,44 +34,22 @@ function calculateCompound() {
 
   if (months > 0) {
     for (let i = 1; i <= months; i++) {
-      const isPaymentMonth = granularity === "monthly" ||
-        (granularity === "quarterly" && i % 3 === 0) ||
-        (granularity === "semiannually" && i % 6 === 0) ||
-        (granularity === "annually" && i % 12 === 0);
-      const isDepositMonth = granularity === "monthly" || (i % Math.floor(frequency / 12) === 0);
       const isCompoundMonth = frequency > 0 && (i % Math.floor(12 / frequency) === 0);
-
-      const deposit = isDepositMonth ? monthly : 0;
+      const deposit = monthly;
       let interest = 0;
-      let payout = 0;
-
-      // Compound interest calculation
+  
       if (isCompoundMonth) {
         interest = balance * periodRate;
-        if (mode === "compound" || (mode === "payout" && granularity === "annually")) {
-          balance += interest;
-        }
+        balance += interest;
       }
-
+  
       balance += deposit;
       totalInterest += interest;
-
-      // Payment schedule logic (only subtract balance if payout happens)
-      if (mode === "payout" && isPaymentMonth) {
-        payout = granularity === "annually"
-          ? (Math.pow(1 + rate / frequency, frequency * (months / 12)) * principal - principal)
-          : (principal * rate) / (
-              granularity === "monthly" ? 12 :
-              granularity === "quarterly" ? 4 :
-              granularity === "semiannually" ? 2 : 1);
-        // Do not subtract payout from balance — in interest-only mode, principal remains untouched
-      }
-
+  
       const label = getPeriodLabel(i, 12);
-
+  
       data.push({
         label,
-        paymentSchedule: (mode === "payout" && isPaymentMonth) ? `$${payout.toFixed(2)}` : '',
         deposit,
         interest,
         balance
@@ -98,50 +74,6 @@ function calculateCompound() {
   showDownloadButton(data);
   showCSVExportButton(data);
 }
-
-// function compareScenarios(scenarios) {
-//   const container = document.getElementById("comparison-results");
-//   const section = document.getElementById("comparison-section");
-//   section.style.opacity = 0;
-//   section.style.opacity = 0;
-//   section.style.display = "block";
-//   setTimeout(() => {
-//     section.style.transition = "opacity 0.5s ease";
-//     section.style.opacity = 1;
-//   }, 10);
-//   setTimeout(() => {
-//     section.style.transition = "opacity 0.5s";
-//     section.style.opacity = 1;
-//   }, 10);
-
-//   let html = '<table><thead><tr><th>Scenario</th><th>Final Balance</th><th>Total Interest</th><th>IRR</th><th>CAGR</th><th>APY</th></tr></thead><tbody>';
-
-//   scenarios.forEach(({ name, principal, monthly, months, rate, frequency }) => {
-//     const compoundingsPerYear = frequency;
-//     const tYears = months / 12;
-//     const maturity = frequency > 0
-//       ? principal * Math.pow(1 + rate / 100 / compoundingsPerYear, compoundingsPerYear * tYears)
-//       : principal;
-
-//     const totalInterest = maturity - principal;
-//     const totalInvested = principal + (monthly * months);
-//     const irr = computeIRR(principal, monthly, months, maturity);
-//     const CAGR = Math.pow(maturity / totalInvested, 1 / tYears) - 1;
-//     const APY = (Math.pow(1 + (rate / 100) / compoundingsPerYear, compoundingsPerYear) - 1) * 100;
-
-//     html += `<tr>
-//       <td>${name}</td>
-//       <td>$${maturity.toFixed(2)}</td>
-//       <td>$${totalInterest.toFixed(2)}</td>
-//       <td>${(irr * 100).toFixed(2)}%</td>
-//       <td>${(CAGR * 100).toFixed(2)}%</td>
-//       <td>${APY.toFixed(4)}%</td>
-//     </tr>`;
-//   });
-
-//   html += '</tbody></table>';
-//   container.innerHTML = html + '<br><button onclick="hideComparison()">Hide Scenarios</button>';
-// }
 
 function updateSummary(finalBalance, totalInterest, irr, CAGR) {
   const summary = document.getElementById("summary");
