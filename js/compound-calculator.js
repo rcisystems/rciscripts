@@ -34,16 +34,17 @@ function calculateCompound() {
 
   if (months > 0) {
     for (let i = 1; i <= months; i++) {
-      const isCompoundMonth = frequency > 0 && (i % Math.floor(12 / frequency) === 0);
+      const isCompoundMonth = frequency > 0;
       const deposit = monthly;
       let interest = 0;
   
-      if (isCompoundMonth) {
+      balance += deposit;
+if (isCompoundMonth) {
         interest = balance * periodRate;
         balance += interest;
       }
   
-      balance += deposit;
+      
       totalInterest += interest;
   
       const label = getPeriodLabel(i, 12);
@@ -87,11 +88,9 @@ function updateSummary(finalBalance, totalInterest, irr, CAGR) {
   const tYears = months / 12;
   const totalInvested = principal + (monthly * months);
 
-  const maturity = frequency > 0
-    ? principal * Math.pow(1 + rate / frequency, frequency * tYears)
-    : principal;
+  const maturity = finalBalance;
 
-  const apy = (Math.pow(1 + rate / frequency, frequency) - 1) * 100;
+  const apy = frequency > 0 ? (Math.pow(1 + rate / frequency, frequency) - 1) * 100 : rate * 100;
   const correctedCAGR = Math.pow(maturity / totalInvested, 1 / tYears) - 1;
 
   const formulaNote = "Formula used: A = P(1 + r/n)<sup>nt</sup>";
