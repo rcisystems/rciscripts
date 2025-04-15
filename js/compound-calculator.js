@@ -1,4 +1,5 @@
 // compound-calculator.js
+
 function getPeriodLabel(index, frequency) {
   const unit = {
     365: 'Day',
@@ -22,8 +23,9 @@ function calculateCompound() {
   }
 
   const principal = parseFloat(document.getElementById("principal").value);
-  const monthly = parseFloat(document.getElementById("monthly").value);
+  const monthlyDeposit = parseFloat(document.getElementById("monthly").value);
   const years = parseFloat(document.getElementById("years").value);
+  // Total months to simulate
   const months = Math.round(years * 12);
   if (years <= 0) {
     alert("Investment period must be greater than zero.");
@@ -33,78 +35,78 @@ function calculateCompound() {
   const rate = parseFloat(document.getElementById("rate").value) / 100;
   const frequency = parseInt(document.getElementById("compound").value);
 
-  const periodRate = frequency > 0 ? rate / frequency : 0;
+  // Effective monthly rate based on the user-selected compounding frequency:
+  // For example, for semiannual (2 compounds per year),
+  // effectiveMonthlyRate = (1 + r/2)^(2/12) - 1.
+  const effectiveMonthlyRate = frequency > 0 ?
+    Math.pow(1 + rate / frequency, frequency / 12) - 1 : 0;
+
   let balance = principal;
-  const data = [];
   let totalInterest = 0;
 
-  if (months > 0) {
-    for (let i = 1; i <= months; i++) {
-      const isCompoundMonth = frequency > 0;
-      const deposit = monthly;
-      let interest = 0;
-  
-      balance += deposit;
-if (isCompoundMonth) {
-        interest = balance * periodRate;
-        balance += interest;
-      }
-  
-      
-      totalInterest += interest;
-  
-      const label = `Month ${i}`;
-  
-      data.push({
+  // We'll accumulate monthly results but group them into annual buckets.
+  const annualData = [];
+  // Temporary accumulators for the current year.
+  let annualDeposit = 0;
+  let annualInterest = 0;
+  let currentYear = 1;
+
+  for (let i = 1; i <= months; i++) {
+    // Each month: add the monthly deposit and record it.
+    balance += monthlyDeposit;
+    annualDeposit += monthlyDeposit;
+
+    // Calculate interest using the effective monthly rate.
+    const interest = balance * effectiveMonthlyRate;
+    balance += interest;
+    annualInterest += interest;
+    totalInterest += interest;
+
+    // When a full year is complete, or if it is the final month:
+    if (i % 12 === 0 || i === months) {
+      const label = `Year ${currentYear}`;
+      annualData.push({
         label,
-        deposit,
-        interest,
-        balance
+        deposit: annualDeposit,
+        interest: annualInterest,
+        balance: balance
       });
+      // Reset the yearly accumulators for the next year.
+      annualDeposit = 0;
+      annualInterest = 0;
+      currentYear++;
     }
   }
 
-  const totalInvested = principal + (monthly * months);
-  const irr = computeIRR(principal, monthly, months, balance);
-  const CAGR = Math.pow(balance / totalInvested, 12 / months) - 1;
+  const totalInvested = principal + (monthlyDeposit * months);
+  const irr = computeIRR(principal, monthlyDeposit, months, balance);
+  // CAGR calculated annually.
+  const CAGR = Math.pow(balance / totalInvested, 1 / years) - 1;
 
   document.getElementById("summary").style.display = "block";
   document.querySelector(".charts-container").style.display = "block";
   const amortTable = document.getElementById("amortization-schedule");
   amortTable.style.opacity = 0;
   amortTable.style.display = "table";
-  setTimeout(() => { amortTable.style.transition = "opacity 0.5s"; amortTable.style.opacity = 1; }, 10);
+  setTimeout(() => {
+    amortTable.style.transition = "opacity 0.5s";
+    amortTable.style.opacity = 1;
+  }, 10);
 
-  updateSummary(balance, totalInterest, irr, CAGR);
-  renderTable(data);
-  renderChart(data);
-  showDownloadButton(data);
-  showCSVExportButton(data);
+  updateSummary(balance, totalInterest, irr, CAGR, principal, monthlyDeposit, months, rate, frequency);
+  renderTable(annualData);
+  renderChart(annualData);
+  showDownloadButton(annualData);
+  showCSVExportButton(annualData);
 }
 
-function updateSummary(finalBalance, totalInterest, irr, CAGR) {
+function updateSummary(finalBalance, totalInterest, irr, CAGR, principal, monthlyDeposit, months, rate, frequency) {
   const summary = document.getElementById("summary");
-  const principal = parseFloat(document.getElementById("principal").value);
-  const monthly = parseFloat(document.getElementById("monthly").value);
-  const years = parseFloat(document.getElementById("years").value);
-  const months = Math.round(years * 12);
-  if (years <= 0) {
-    alert("Investment period must be greater than zero.");
-    return;
-  }
+  const years = months / 12;
+  const totalInvested = principal + (monthlyDeposit * months);
 
-  const aprPercent = parseFloat(document.getElementById("rate").value);
-  const rate = aprPercent / 100;
-  const frequency = parseInt(document.getElementById("compound").value);
-
-  const tYears = months / 12;
-  const totalInvested = principal + (monthly * months);
-
-  const maturity = finalBalance;
-
+  // Compute the APY based on the selected compounding frequency
   const apy = frequency > 0 ? (Math.pow(1 + rate / frequency, frequency) - 1) * 100 : rate * 100;
-  const correctedCAGR = Math.pow(maturity / totalInvested, 1 / tYears) - 1;
-
   const formulaNote = "Formula used: A = P(1 + r/n)<sup>nt</sup>";
 
   summary.innerHTML = `
@@ -114,11 +116,11 @@ function updateSummary(finalBalance, totalInterest, irr, CAGR) {
         border-bottom: 1px dotted #000;
       }
     </style>
-    <p><strong>Final Balance:</strong> <span class="info-icon" title="Your ending balance after all deposits and interest.">[?]</span> $${maturity.toFixed(2)}</p>
-    <p><strong>Total Interest Earned:</strong> <span class="info-icon" title="Total interest earned over the entire investment period.">[?]</span> $${(maturity - totalInvested).toFixed(2)}</p>
-    <p><strong>Estimated IRR (Annualized):</strong> <span class="info-icon" title="Annualized return considering all deposits and cash flow.">[?]</span> ${((Math.pow(1 + irr, 12) - 1) * 100).toFixed(2)}%</p>
-    <p><strong>Compounded Annual Growth Rate (CAGR):</strong> <span class="info-icon" title="Smoothed annual return from start to final balance.">[?]</span> ${(correctedCAGR * 100).toFixed(2)}%</p>
-    <p><strong>APY:</strong> <span class="info-icon" title="Annual Percentage Yield, based on compound frequency.">[?]</span> ${apy.toFixed(4)}%</p>
+    <p><strong>Final Balance:</strong> <span class="info-icon" data-tooltip="Your ending balance after all deposits and interest.">[?]</span> $${finalBalance.toFixed(2)}</p>
+    <p><strong>Total Interest Earned:</strong> <span class="info-icon" data-tooltip="Total interest earned over the entire investment period.">[?]</span> $${(finalBalance - totalInvested).toFixed(2)}</p>
+    <p><strong>Estimated IRR (Annualized):</strong> <span class="info-icon" data-tooltip="Annualized return considering all deposits and cash flow.">[?]</span> ${((Math.pow(1 + irr, 12) - 1) * 100).toFixed(2)}%</p>
+    <p><strong>Compounded Annual Growth Rate (CAGR):</strong> <span class="info-icon" data-tooltip="Smoothed annual return from start to final balance.">[?]</span> ${(CAGR * 100).toFixed(2)}%</p>
+    <p><strong>APY:</strong> <span class="info-icon" data-tooltip="Annual Percentage Yield, based on compound frequency.">[?]</span> ${apy.toFixed(4)}%</p>
     <p><em>${formulaNote} where t = years</em></p>
   `;
 }
@@ -149,13 +151,14 @@ function computeIRR(initial, monthly, months, finalValue, guess = 0.1) {
 }
 
 function renderTable(data) {
+  // Render a table with one row per year.
   const table = document.getElementById("amortization-schedule");
   table.innerHTML = `
     <tr>
-      <th>Period</th>
-      <th>Deposit ($)</th>
-      <th>Interest ($)</th>
-      <th>Balance ($)</th>
+      <th>Year</th>
+      <th>Total Deposits in Year ($)</th>
+      <th>Interest Earned in Year ($)</th>
+      <th>Year-End Balance ($)</th>
     </tr>
   `;
 
@@ -171,13 +174,6 @@ function renderTable(data) {
   });
 }
 
-function hideComparison() {
-  const section = document.getElementById("comparison-section");
-  section.style.transition = "opacity 0.5s ease";
-  section.style.opacity = 0;
-  setTimeout(() => section.style.display = "none", 500);
-}
-
 function renderChart(data) {
   const ctx = document.getElementById("balanceChart").getContext("2d");
 
@@ -190,7 +186,7 @@ function renderChart(data) {
     data: {
       labels: data.map(row => row.label),
       datasets: [{
-        label: "Balance Over Time",
+        label: "Year-End Balance",
         data: data.map(row => row.balance),
         borderColor: "#4a90e2",
         backgroundColor: "rgba(74, 144, 226, 0.2)",
@@ -219,7 +215,6 @@ function renderChart(data) {
   });
 }
 
-
 function resetCompoundForm() {
   document.getElementById("compound-calculator").reset();
   document.getElementById("summary").innerHTML = "";
@@ -246,7 +241,7 @@ function showCSVExportButton(data) {
 }
 
 function downloadCSV(data) {
-  const csvRows = ["Period,Deposit,Interest,Balance"];
+  const csvRows = ["Year,Total Deposits,Interest,Balance"];
   data.forEach(row => {
     csvRows.push(`${row.label},${row.deposit.toFixed(2)},${row.interest.toFixed(2)},${row.balance.toFixed(2)}`);
   });
@@ -269,7 +264,7 @@ function downloadPDF() {
   const data = window.compoundData;
   let y = 20;
   data.slice(0, 40).forEach(row => {
-    doc.text(`${row.label}: Balance $${row.balance.toFixed(2)}, Interest $${row.interest.toFixed(2)}, Deposit $${row.deposit.toFixed(2)}`, 10, y);
+    doc.text(`${row.label}: Balance $${row.balance.toFixed(2)}, Interest $${row.interest.toFixed(2)}, Deposits $${row.deposit.toFixed(2)}`, 10, y);
     y += 6;
     if (y > 270) {
       doc.addPage();
