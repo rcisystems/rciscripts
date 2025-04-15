@@ -13,7 +13,7 @@ function getPeriodLabel(index, frequency) {
 }
 
 function calculateCompound() {
-  const fields = ["principal", "monthly", "months", "rate", "compound"];
+  const fields = ["principal", "monthly", "years", "rate", "compound"];
   for (const id of fields) {
     if (!document.getElementById(id)) {
       alert(`Form element "${id}" not found. Please check your HTML.`);
