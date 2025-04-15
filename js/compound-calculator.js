@@ -23,7 +23,13 @@ function calculateCompound() {
 
   const principal = parseFloat(document.getElementById("principal").value);
   const monthly = parseFloat(document.getElementById("monthly").value);
-  const months = parseInt(document.getElementById("months").value);
+  const years = parseFloat(document.getElementById("years").value);
+  const months = Math.round(years * 12);
+  if (years <= 0) {
+    alert("Investment period must be greater than zero.");
+    return;
+  }
+
   const rate = parseFloat(document.getElementById("rate").value) / 100;
   const frequency = parseInt(document.getElementById("compound").value);
 
@@ -47,7 +53,7 @@ if (isCompoundMonth) {
       
       totalInterest += interest;
   
-      const label = getPeriodLabel(i, 12);
+      const label = `Month ${i}`;
   
       data.push({
         label,
@@ -80,7 +86,13 @@ function updateSummary(finalBalance, totalInterest, irr, CAGR) {
   const summary = document.getElementById("summary");
   const principal = parseFloat(document.getElementById("principal").value);
   const monthly = parseFloat(document.getElementById("monthly").value);
-  const months = parseInt(document.getElementById("months").value);
+  const years = parseFloat(document.getElementById("years").value);
+  const months = Math.round(years * 12);
+  if (years <= 0) {
+    alert("Investment period must be greater than zero.");
+    return;
+  }
+
   const aprPercent = parseFloat(document.getElementById("rate").value);
   const rate = aprPercent / 100;
   const frequency = parseInt(document.getElementById("compound").value);
@@ -107,7 +119,7 @@ function updateSummary(finalBalance, totalInterest, irr, CAGR) {
     <p><strong>Estimated IRR (Annualized):</strong> <span class="info-icon" title="Annualized return considering all deposits and cash flow.">[?]</span> ${((Math.pow(1 + irr, 12) - 1) * 100).toFixed(2)}%</p>
     <p><strong>Compounded Annual Growth Rate (CAGR):</strong> <span class="info-icon" title="Smoothed annual return from start to final balance.">[?]</span> ${(correctedCAGR * 100).toFixed(2)}%</p>
     <p><strong>APY:</strong> <span class="info-icon" title="Annual Percentage Yield, based on compound frequency.">[?]</span> ${apy.toFixed(4)}%</p>
-    <p><em>${formulaNote}</em></p>
+    <p><em>${formulaNote} where t = years</em></p>
   `;
 }
 
