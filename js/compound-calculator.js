@@ -21,9 +21,13 @@ function calculateCompound() {
       return;
     }
   }
+  document.getElementById("principal").placeholder = "e.g. 10,000";
+  document.getElementById("monthly").placeholder = "e.g. 200";
+  document.getElementById("years").placeholder = "e.g. 20";
+  document.getElementById("rate").placeholder = "e.g. 7.5";
 
   const principal = parseFloat(document.getElementById("principal").value);
-  const monthlyDeposit = parseFloat(document.getElementById("monthly").value);
+  const monthlyDeposit = parseFloat(document.getElementById("monthly").value) || 0;
   const years = parseFloat(document.getElementById("years").value);
   // Total months to simulate
   const months = Math.round(years * 12);
@@ -116,16 +120,19 @@ function updateSummary(finalBalance, totalInterest, irr, CAGR, principal, monthl
         border-bottom: 1px dotted #000;
       }
     </style>
-    <p><strong>Final Balance:</strong> <span class="info-icon" data-tooltip="Your ending balance after all deposits and interest.">[?]</span> $${finalBalance.toFixed(2)}</p>
-    <p><strong>Total Interest Earned:</strong> <span class="info-icon" data-tooltip="Total interest earned over the entire investment period.">[?]</span> $${(finalBalance - totalInvested).toFixed(2)}</p>
-    <p><strong>Estimated IRR (Annualized):</strong> <span class="info-icon" data-tooltip="Annualized return considering all deposits and cash flow.">[?]</span> ${((Math.pow(1 + irr, 12) - 1) * 100).toFixed(2)}%</p>
-    <p><strong>Compounded Annual Growth Rate (CAGR):</strong> <span class="info-icon" data-tooltip="Smoothed annual return from start to final balance.">[?]</span> ${(CAGR * 100).toFixed(2)}%</p>
-    <p><strong>APY:</strong> <span class="info-icon" data-tooltip="Annual Percentage Yield, based on compound frequency.">[?]</span> ${apy.toFixed(4)}%</p>
+        <p><strong>Final Balance:</strong> <span class="info-icon" data-tooltip="Your ending balance after all deposits and interest.">[?]</span> ${formatCurrency(finalBalance)}</p>
+    <p><strong>Total Interest Earned:</strong> <span class="info-icon" data-tooltip="Total interest earned over the entire investment period.">[?]</span> ${formatCurrency(finalBalance - totalInvested)}</p>
+    <p><strong>Estimated IRR (Annualized):</strong> <span class="info-icon" data-tooltip="Annualized return considering all deposits and cash flow. 'N/A' means the result could not be calculated (e.g., only a single lump-sum investment).">[?]</span> ${isFinite(irr) ? ((Math.pow(1 + irr, 12) - 1) * 100).toFixed(2) + "%" : "N/A"}</p>
+    <p><strong>Compounded Annual Growth Rate (CAGR):</strong> <span class="info-icon" data-tooltip="Smoothed annual return from start to final balance. 'N/A' means the input values prevented a valid CAGR calculation.">[?]</span> ${isFinite(CAGR) ? (CAGR * 100).toFixed(2) + "%" : "N/A"}</p>
+    <p><strong>APY:</strong> <span class="info-icon" data-tooltip="Annual Percentage Yield, based on compound frequency. 'N/A' means compounding could not be calculated due to invalid input values.">[?]</span> ${isFinite(apy) ? apy.toFixed(4) + "%" : "N/A"}</p>
     <p><em>${formulaNote} where t = years</em></p>
   `;
 }
 
 function computeIRR(initial, monthly, months, finalValue, guess = 0.1) {
+  // if (monthly === 0) {
+  //   return Math.pow(finalValue / initial, 1 / months) - 1;
+  // }
   let rate = guess;
   const maxIter = 1000;
   const tol = 1e-6;
@@ -166,9 +173,9 @@ function renderTable(data) {
     table.innerHTML += `
       <tr>
         <td>${row.label}</td>
-        <td>${row.deposit.toFixed(2)}</td>
-        <td>${row.interest.toFixed(2)}</td>
-        <td>${row.balance.toFixed(2)}</td>
+        <td>${formatCurrency(row.deposit)}</td>
+        <td>${formatCurrency(row.interest)}</td>
+        <td>${formatCurrency(row.balance)}</td>
       </tr>
     `;
   });
@@ -199,7 +206,7 @@ function renderChart(data) {
       plugins: {
         tooltip: {
           callbacks: {
-            label: ctx => `$${ctx.raw.toFixed(2)}`
+            label: ctx => formatCurrency(ctx.raw)
           }
         }
       },
@@ -207,7 +214,7 @@ function renderChart(data) {
         y: {
           beginAtZero: true,
           ticks: {
-            callback: value => `$${value}`
+            callback: value => formatCurrency(value)
           }
         }
       }
@@ -240,10 +247,14 @@ function showCSVExportButton(data) {
   container.appendChild(csvButton);
 }
 
+function formatCurrency(amount) {
+  return amount.toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
+
 function downloadCSV(data) {
   const csvRows = ["Year,Total Deposits,Interest,Balance"];
   data.forEach(row => {
-    csvRows.push(`${row.label},${row.deposit.toFixed(2)},${row.interest.toFixed(2)},${row.balance.toFixed(2)}`);
+    csvRows.push(`${row.label},${formatCurrency(row.deposit)},${formatCurrency(row.interest)},${formatCurrency(row.balance)}`);
   });
   const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
@@ -264,7 +275,7 @@ function downloadPDF() {
   const data = window.compoundData;
   let y = 20;
   data.slice(0, 40).forEach(row => {
-    doc.text(`${row.label}: Balance $${row.balance.toFixed(2)}, Interest $${row.interest.toFixed(2)}, Deposits $${row.deposit.toFixed(2)}`, 10, y);
+    doc.text(`${row.label}: Balance ${formatCurrency(row.balance)}, Interest ${formatCurrency(row.interest)}, Deposits ${formatCurrency(row.deposit)}`, 10, y);
     y += 6;
     if (y > 270) {
       doc.addPage();
