@@ -83,7 +83,9 @@ function calculateCompound() {
   }
 
   const totalInvested = principal + (monthlyDeposit * months);
-  const irr = monthlyDeposit > 0
+  // Use the toggle to determine which IRR to show
+  const reinvestmentMode = document.getElementById("reinforcement-toggle") && document.getElementById("reinforcement-toggle").checked;
+  const irr = reinvestmentMode
     ? computeCashflowIRR(principal, monthlyDeposit, months, balance, frequency)
     : computeDateBasedXIRR(principal, balance, months);
   // Log the result of both IRR functions to ensure the correct one is being used
@@ -105,7 +107,8 @@ function calculateCompound() {
     amortTable.style.opacity = 1;
   }, 10);
 
-  updateSummary(balance, totalInterest, irr, CAGR, principal, monthlyDeposit, months, rate, frequency);
+  // Use the correct IRR value based on the reinvestment toggle
+  updateSummary(balance, totalInterest, reinvestmentMode ? testIRR : testXIRR, CAGR, principal, monthlyDeposit, months, rate, frequency);
   renderTable(annualData);
   renderChart(annualData);
   showDownloadButton(annualData);
@@ -119,8 +122,17 @@ function updateSummary(finalBalance, totalInterest, irr, CAGR, principal, monthl
 
   // Compute the APY based on the selected compounding frequency
   const apy = frequency > 0 ? (Math.pow(1 + rate / frequency, frequency) - 1) * 100 : rate * 100;
+  // Compute APY-style return from IRR, assuming monthly reinvestment
+  const monthlyReinvestedRate = Math.pow(1 + irr, 1 / 12) - 1;
+  const apyStyleFromXIRR = (Math.pow(1 + monthlyReinvestedRate, 12) - 1) * 100;
   const formulaNote = "Formula used: A = P(1 + r/n)<sup>nt</sup>";
 
+  // Clarify and label the current IRR mode and log
+  const reinvestmentToggle = document.getElementById("reinforcement-toggle");
+  const reinvestmentMode = reinvestmentToggle && reinvestmentToggle.checked;
+  logDebug("Summary Mode:", reinvestmentMode ? "Reinvestment" : "Lump Sum");
+  logDebug("IRR used in Summary:", irr);
+  logDebug("APY-style return from IRR:", apyStyleFromXIRR);
   // Log IRR being passed in to confirm it's updating
   logDebug("IRR passed to updateSummary:", irr);
 
@@ -133,11 +145,27 @@ function updateSummary(finalBalance, totalInterest, irr, CAGR, principal, monthl
     </style>
     <p><strong>Final Balance:</strong> <span class="info-icon" data-tooltip="Your ending balance after all deposits and interest.">[?]</span> ${formatCurrency(finalBalance)}</p>
     <p><strong>Total Interest Earned:</strong> <span class="info-icon" data-tooltip="Total interest earned over the entire investment period.">[?]</span> ${formatCurrency(finalBalance - totalInvested)}</p>
-    <p><strong>Effective Return (IRR):</strong> <span class="info-icon" data-tooltip="Annualized return considering all deposits and cash flow. 'N/A' means the result could not be calculated (e.g., only a single lump-sum investment).">[?]</span> ${isFinite(irr) ? (irr * 100).toFixed(2) + "%" : "N/A"}</p>
+    <p><strong>Effective Return (IRR):</strong> <span class="info-icon" data-tooltip="Annualized return considering all deposits and cash flow.">${isFinite(irr) ? (irr * 100).toFixed(2) + "%" : "N/A"} ${reinvestmentMode ? "(Monthly Reinvestment)" : "(Lump Sum)"}</span></p>
+    <p><strong>Total Return (XIRR Equivalent):</strong> <span class="info-icon" data-tooltip="Total growth over the investment period based on IRR.">${isFinite(irr) ? ((Math.pow(1 + irr, years) - 1) * 100).toFixed(2) + "%" : "N/A"} over ${years} years</span></p>
+    <p><strong>Equity Multiple:</strong> <span class="info-icon" data-tooltip="Final balance divided by total invested amount.">${isFinite(finalBalance / totalInvested) ? (finalBalance / totalInvested).toFixed(2) + "x" : "N/A"}</span></p>
+    ${
+      reinvestmentMode
+        ? `<p><strong>Monthly-Reinvested Return (APY Style):</strong> <span class="info-icon" data-tooltip="Simulates reinvested monthly compounding based on IRR. Useful for comparing against APYs shown on some investment platforms.">[?]</span> ${isFinite(apyStyleFromXIRR) ? apyStyleFromXIRR.toFixed(2) + "%" : "N/A"}</p>
+           <p><strong>Equivalent Monthly Compounding Yield:</strong> <span class="info-icon" data-tooltip="This is the monthly return rate that, if compounded monthly, would result in the same final value.">${isFinite(monthlyReinvestedRate) ? (monthlyReinvestedRate * 100).toFixed(4) + "% monthly (Annualized to " + apyStyleFromXIRR.toFixed(2) + "%)" : "N/A"}</span></p>`
+        : ""
+    }
     <p><strong>Compounded Annual Growth Rate (CAGR):</strong> <span class="info-icon" data-tooltip="Smoothed annual return from start to final balance. 'N/A' means the input values prevented a valid CAGR calculation.">[?]</span> ${isFinite(CAGR) ? (CAGR * 100).toFixed(2) + "%" : "N/A"}</p>
     <p><strong>APY:</strong> <span class="info-icon" data-tooltip="Annual Percentage Yield, based on compound frequency. 'N/A' means compounding could not be calculated due to invalid input values.">[?]</span> ${isFinite(apy) ? apy.toFixed(4) + "%" : "N/A"}</p>
     <p><em>${formulaNote} where t = years</em></p>
   `;
+
+  // Add the required monthly yield to hit this return, but only in reinvestmentMode
+  if (reinvestmentMode) {
+    const monthlyToTargetRate = Math.pow(finalBalance / principal, 1 / months) - 1;
+    const annualizedTargetRate = (Math.pow(1 + monthlyToTargetRate, 12) - 1) * 100;
+    summary.innerHTML +=
+      `<p><strong>Required Monthly Yield to Hit This Return:</strong> <span class="info-icon" data-tooltip="This is the monthly return required to grow from principal to final value over the time period.">${(monthlyToTargetRate * 100).toFixed(4)}% monthly (Annualized to ${annualizedTargetRate.toFixed(2)}%)</span></p>`;
+  }
 }
 
 function computeCashflowIRR(initial, monthly, months, finalValue, frequency, guess = 0.1) {
@@ -382,6 +410,11 @@ function logDebug(...args) {
 
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Compound Calculator Loaded");
+  // Add mode toggle above the calculator
+  const modeToggle = document.createElement("label");
+  modeToggle.innerHTML = '<input type="checkbox" id="reinforcement-toggle"> Use Monthly Reinvestment (APY Style)';
+  document.body.prepend(modeToggle);
+
   const debugToggle = document.createElement("label");
   debugToggle.innerHTML = '<input type="checkbox" id="debug-toggle"> Show Debug Info';
   document.body.prepend(debugToggle);
@@ -391,6 +424,32 @@ document.addEventListener("DOMContentLoaded", () => {
   xirrValidateBtn.textContent = "Run XIRR Excel Validator";
   xirrValidateBtn.onclick = () => runXIRRValidation();
   document.body.appendChild(xirrValidateBtn);
+
+  // --- Reverse XIRR Calculator UI ---
+  const xirrSolveContainer = document.createElement("div");
+  xirrSolveContainer.innerHTML = `
+    <h4>Reverse XIRR Calculator</h4>
+    <label>Starting Amount: <input id="reverse-start" value="200000"></label>
+    <label>Final Amount: <input id="reverse-end" value="1148698.23"></label>
+    <label>Years: <input id="reverse-years" value="15"></label>
+    <label>Target XIRR (%): <input id="reverse-xirr" value="22.1"></label>
+    <button id="solve-xirr-btn">Solve Interest Rate</button>
+    <p id="reverse-result"></p>
+  `;
+  document.body.appendChild(xirrSolveContainer);
+  document.getElementById("solve-xirr-btn").onclick = () => {
+    const P = parseFloat(document.getElementById("reverse-start").value);
+    const A = parseFloat(document.getElementById("reverse-end").value);
+    const t = parseFloat(document.getElementById("reverse-years").value);
+    const xirr = parseFloat(document.getElementById("reverse-xirr").value) / 100;
+    // Nominal annual rate required to grow P to A in t years, compounded monthly:
+    // A = P * (1 + r)^t, so r = (A/P)^(1/t) - 1 (annual nominal, compounded annually)
+    // For monthly compounding, r_month = (A/P)^(1/(12*t)) - 1, then annualize: (1+r_month)^12-1
+    const r_annual = (Math.pow(A / P, 1 / t) - 1) * 100;
+    document.getElementById("reverse-result").innerText =
+      `To grow ${formatCurrency(P)} to ${formatCurrency(A)} over ${t} years at ${xirr * 100}% XIRR:
+→ Nominal rate (annual, compounded annually): ${r_annual.toFixed(2)}%`;
+  };
 });
 
 function testXIRR() {
@@ -413,6 +472,150 @@ function testXIRR() {
 
 // Run test
 testXIRR();
+
+function generateMonthlyCashflows(principal, monthly, years) {
+  const startDate = new Date();
+  const cashflows = [];
+  const dates = [];
+  const months = years * 12;
+  if (principal > 0) {
+    cashflows.push(-principal);
+    dates.push(startDate);
+  }
+  for (let i = 1; i <= months; i++) {
+    const dt = new Date(startDate.getTime());
+    dt.setMonth(dt.getMonth() + i);
+    cashflows.push(-monthly);
+    dates.push(dt);
+  }
+  return { cashflows, dates };
+}
+
+function computeRealXIRR(cashflows, dates) {
+  const maxIter = 100;
+  const tol = 1e-7;
+  let rate = 0.1;
+
+  for (let iter = 0; iter < maxIter; iter++) {
+    let npv = 0;
+    let dNpv = 0;
+    for (let i = 0; i < cashflows.length; i++) {
+      const dt = (dates[i] - dates[0]) / (1000 * 60 * 60 * 24);
+      const frac = dt / 365;
+      const denom = Math.pow(1 + rate, frac);
+      npv += cashflows[i] / denom;
+      dNpv -= (frac * cashflows[i]) / (denom * (1 + rate));
+    }
+    const newRate = rate - npv / dNpv;
+    if (Math.abs(newRate - rate) < tol) return newRate;
+    rate = newRate;
+  }
+  return rate;
+}
+
+function runXIRRTestMatrix() {
+  const failedRows = [];
+  const durations = [1, 3, 5, 7, 10, 15, 20, 25, 30];
+  const rates = [0.10, 0.12]; // 10% and 12%
+  const freqs = [1, 2]; // annual and semiannual
+  const payments = [100, 250, 300, 500, 750, 1000, 1200, 1500, 2000];
+  const principal = 0;
+
+  durations.forEach(years => {
+    const months = years * 12;
+    rates.forEach(rate => {
+      freqs.forEach(freq => {
+        payments.forEach(monthly => {
+          const { cashflows, dates } = generateMonthlyCashflows(principal, monthly, years);
+          const futureValue = computeFutureValue(principal, monthly, rate, freq, months);
+          cashflows.push(futureValue); // simulate final lump sum payout
+          dates.push(new Date(dates[dates.length - 1].getTime() + 24 * 60 * 60 * 1000));
+          const xirr = computeRealXIRR(cashflows, dates);
+          const label = `Years: ${years}, Rate: ${(rate * 100).toFixed(0)}%, Freq: ${freq === 1 ? 'Annual' : 'Semiannual'}, Monthly: ${monthly}`;
+          if (xirr <= 0 || xirr > 1) {
+            failedRows.push({ years, rate: rate * 100, freq: freq === 1 ? 'Annual' : 'Semiannual', monthly, xirr: xirr * 100 });
+            logDebug(`❌ FAIL - ${label} → IRR: ${(xirr * 100).toFixed(2)}%`);
+          } else {
+            logDebug(`✅ PASS - ${label} → IRR: ${(xirr * 100).toFixed(2)}%`);
+          }
+        });
+      });
+    });
+  });
+
+  // Render failed cases as an HTML table, or show all-pass message
+  if (failedRows.length > 0) {
+    const container = document.createElement("div");
+    container.innerHTML = "<h3>❌ Failing XIRR Test Cases</h3><table border='1'><tr><th>Years</th><th>Rate (%)</th><th>Compounding</th><th>Monthly</th><th>IRR (%)</th></tr></table>";
+    const table = container.querySelector("table");
+    failedRows.forEach(row => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${row.years}</td><td>${row.rate}</td><td>${row.freq}</td><td>${row.monthly}</td><td>${row.xirr.toFixed(2)}</td>`;
+      table.appendChild(tr);
+    });
+
+    // CSV download button for failed rows
+    const csvBtn = document.createElement("button");
+    csvBtn.textContent = "Download Failures as CSV";
+    csvBtn.onclick = () => {
+      const csv = ["Years,Rate (%),Compounding,Monthly,IRR (%)"];
+      failedRows.forEach(row => {
+        csv.push(`${row.years},${row.rate},${row.freq},${row.monthly},${row.xirr.toFixed(2)}`);
+      });
+      const blob = new Blob([csv.join("\n")], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "xirr_failures.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    container.appendChild(csvBtn);
+    document.body.appendChild(container);
+  } else {
+    const passMessage = document.createElement("p");
+    passMessage.textContent = "✅ All XIRR tests passed.";
+    document.body.appendChild(passMessage);
+  }
+}
+
+function computeFutureValue(principal, monthly, rate, frequency, months) {
+  const periods = months;
+  const r = Math.pow(1 + rate / frequency, frequency / 12) - 1;
+  let balance = principal;
+  for (let i = 1; i <= periods; i++) {
+    balance += monthly;
+    const interest = balance * r;
+    balance += interest;
+  }
+  return balance;
+}
+
+runXIRRTestMatrix();
+
+// Test that toggling the reinvestment mode changes the IRR being used
+function testReinvestmentToggleMode() {
+  const principal = 200000;
+  const years = 15;
+  const months = years * 12;
+  const rate = 0.12;
+  const frequency = 2;
+  const finalValue = 1148698.23;
+  const monthly = 0;
+
+  const reinvestedIRR = computeCashflowIRR(principal, monthly, months, finalValue, frequency);
+  const xirr = computeDateBasedXIRR(principal, finalValue, months);
+
+  const difference = Math.abs(reinvestedIRR - xirr);
+  const toggledCorrectly = difference > 0.0005;
+  logDebug("Toggle Mode Test:");
+  logDebug("computeCashflowIRR:", (reinvestedIRR * 100).toFixed(2) + "%");
+  logDebug("computeDateBasedXIRR:", (xirr * 100).toFixed(2) + "%");
+  logDebug("Toggle correctly affects IRR value?", toggledCorrectly ? "✅ YES" : "❌ NO");
+}
+
+testReinvestmentToggleMode();
 
 // Live XIRR Excel validator
 function runXIRRValidation() {
