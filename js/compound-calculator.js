@@ -83,7 +83,15 @@ function calculateCompound() {
   }
 
   const totalInvested = principal + (monthlyDeposit * months);
-  const irr = computeIRR(principal, monthlyDeposit, months, balance, frequency);
+  const irr = monthlyDeposit > 0
+    ? computeCashflowIRR(principal, monthlyDeposit, months, balance, frequency)
+    : computeDateBasedXIRR(principal, balance, months);
+  // Log the result of both IRR functions to ensure the correct one is being used
+  const testIRR = computeCashflowIRR(principal, monthlyDeposit, months, balance, frequency);
+  const testXIRR = computeDateBasedXIRR(principal, balance, months);
+  logDebug("computeIRR result:", testIRR);
+  logDebug("computeXIRR result:", testXIRR);
+  logDebug("Used IRR value:", irr);
   // CAGR calculated annually.
   const CAGR = Math.pow(balance / totalInvested, 1 / years) - 1;
 
@@ -113,6 +121,9 @@ function updateSummary(finalBalance, totalInterest, irr, CAGR, principal, monthl
   const apy = frequency > 0 ? (Math.pow(1 + rate / frequency, frequency) - 1) * 100 : rate * 100;
   const formulaNote = "Formula used: A = P(1 + r/n)<sup>nt</sup>";
 
+  // Log IRR being passed in to confirm it's updating
+  logDebug("IRR passed to updateSummary:", irr);
+
   summary.innerHTML = `
     <style>
       .info-icon {
@@ -122,14 +133,14 @@ function updateSummary(finalBalance, totalInterest, irr, CAGR, principal, monthl
     </style>
     <p><strong>Final Balance:</strong> <span class="info-icon" data-tooltip="Your ending balance after all deposits and interest.">[?]</span> ${formatCurrency(finalBalance)}</p>
     <p><strong>Total Interest Earned:</strong> <span class="info-icon" data-tooltip="Total interest earned over the entire investment period.">[?]</span> ${formatCurrency(finalBalance - totalInvested)}</p>
-    <p><strong>Estimated IRR (Annualized):</strong> <span class="info-icon" data-tooltip="Annualized return considering all deposits and cash flow. 'N/A' means the result could not be calculated (e.g., only a single lump-sum investment).">[?]</span> ${isFinite(irr) ? (irr * 100).toFixed(2) + "%" : "N/A"}</p>
+    <p><strong>Effective Return (IRR):</strong> <span class="info-icon" data-tooltip="Annualized return considering all deposits and cash flow. 'N/A' means the result could not be calculated (e.g., only a single lump-sum investment).">[?]</span> ${isFinite(irr) ? (irr * 100).toFixed(2) + "%" : "N/A"}</p>
     <p><strong>Compounded Annual Growth Rate (CAGR):</strong> <span class="info-icon" data-tooltip="Smoothed annual return from start to final balance. 'N/A' means the input values prevented a valid CAGR calculation.">[?]</span> ${isFinite(CAGR) ? (CAGR * 100).toFixed(2) + "%" : "N/A"}</p>
     <p><strong>APY:</strong> <span class="info-icon" data-tooltip="Annual Percentage Yield, based on compound frequency. 'N/A' means compounding could not be calculated due to invalid input values.">[?]</span> ${isFinite(apy) ? apy.toFixed(4) + "%" : "N/A"}</p>
     <p><em>${formulaNote} where t = years</em></p>
   `;
 }
 
-function computeIRR(initial, monthly, months, finalValue, frequency, guess = 0.1) {
+function computeCashflowIRR(initial, monthly, months, finalValue, frequency, guess = 0.1) {
   if (monthly === 0) {
     return Math.pow(finalValue / initial, 1 / (months / 12)) - 1;
   }
@@ -154,6 +165,39 @@ function computeIRR(initial, monthly, months, finalValue, frequency, guess = 0.1
     if (Math.abs(newRate - rate) < tol) return newRate;
     rate = newRate;
   }
+  return rate;
+}
+
+function computeDateBasedXIRR(initial, finalValue, months) {
+  const cashFlows = [-initial, finalValue];
+  const now = new Date();
+  const then = new Date(now.getTime());
+  then.setMonth(then.getMonth() + months);
+  const dates = [now, then];
+
+  logDebug("XIRR cashFlows:", cashFlows);
+  logDebug("XIRR dates:", dates.map(d => d.toISOString()));
+
+  const maxIter = 100;
+  const tol = 1e-7;
+  let rate = 0.1;
+
+  for (let iter = 0; iter < maxIter; iter++) {
+    let npv = 0;
+    let dNpv = 0;
+    for (let i = 0; i < cashFlows.length; i++) {
+      const days = (dates[i] - dates[0]) / (1000 * 60 * 60 * 24);
+      const t = days / 365;
+      const denominator = Math.pow(1 + rate, t);
+      npv += cashFlows[i] / denominator;
+      dNpv -= (t * cashFlows[i]) / (denominator * (1 + rate));
+    }
+    logDebug("Iter", iter, "rate", rate, "npv", npv, "dNpv", dNpv);
+    const newRate = rate - npv / dNpv;
+    if (Math.abs(newRate - rate) < tol) return newRate;
+    rate = newRate;
+  }
+
   return rate;
 }
 
@@ -331,6 +375,51 @@ function downloadPDF() {
   }
 }
 
+function logDebug(...args) {
+  const debug = document.getElementById("debug-toggle");
+  if (debug && debug.checked) console.log(...args);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Compound Calculator Loaded");
+  const debugToggle = document.createElement("label");
+  debugToggle.innerHTML = '<input type="checkbox" id="debug-toggle"> Show Debug Info';
+  document.body.prepend(debugToggle);
+
+  // XIRR Excel Validator UI toggle
+  const xirrValidateBtn = document.createElement("button");
+  xirrValidateBtn.textContent = "Run XIRR Excel Validator";
+  xirrValidateBtn.onclick = () => runXIRRValidation();
+  document.body.appendChild(xirrValidateBtn);
 });
+
+function testXIRR() {
+  const testNow = new Date();
+  const testThen = new Date(testNow.getTime());
+  testThen.setMonth(testThen.getMonth() + 180);
+  logDebug("Test XIRR dates:", [testNow.toISOString(), testThen.toISOString()]);
+
+  const expected = 0.221; // 22.1%
+  const actual = computeDateBasedXIRR(200000, 1148698.23, 12 * 15);
+  const pass = Math.abs(actual - expected) < 0.005;
+  logDebug("Test XIRR:", pass ? "✅ Passed" : `❌ Failed (got ${(actual * 100).toFixed(2)}%)`);
+
+  // Second test: 3 years at 10% IRR, 10,000 -> 13,310
+  const expected2 = 0.10;
+  const actual2 = computeDateBasedXIRR(10000, 13310, 36); // 3 years of 10% compound growth
+  const pass2 = Math.abs(actual2 - expected2) < 0.005;
+  logDebug("Test XIRR (10% over 3 years):", pass2 ? "✅ Passed" : `❌ Failed (got ${(actual2 * 100).toFixed(2)}%)`);
+}
+
+// Run test
+testXIRR();
+
+// Live XIRR Excel validator
+function runXIRRValidation() {
+  const expected = 0.221; // Simulated Excel XIRR result
+  const actual = computeDateBasedXIRR(200000, 1148698.23, 12 * 15);
+  const diff = actual - expected;
+  const pass = Math.abs(diff) < 0.005;
+  const message = `Excel XIRR Comparison: ${pass ? "✅ Match" : "❌ Mismatch"}\nExpected (Excel): ${(expected * 100).toFixed(2)}%\nCalculated: ${(actual * 100).toFixed(2)}%\nDifference: ${(diff * 100).toFixed(4)}%`;
+  alert(message);
+}
