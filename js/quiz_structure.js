@@ -118,7 +118,6 @@ function calculateScore() {
         <h3>Overall Score: ${totalScore} / ${maxTotalScore} (${totalPercentage.toFixed(1)}%)</h3>
         <p style="margin-bottom: 20px;">${resultText}</p>
         <!-- Section scores hidden from display -->
-        <button type="button" id="restartQuiz" onclick="resetQuiz()">Restart Quiz</button>
     `;
     
     // Show the user info form for report download immediately after displaying result
