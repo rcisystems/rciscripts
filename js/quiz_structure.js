@@ -158,8 +158,8 @@ async function downloadFullReport() {
     }
 
     // Populate the GHL embedded form fields if they exist
-    const populate = (id, val) => {
-        const el = document.getElementById(id);
+    const populate = (key, val) => {
+        const el = document.querySelector(`[data-q="${key}"]`);
         if (el) el.value = val;
     };
 
