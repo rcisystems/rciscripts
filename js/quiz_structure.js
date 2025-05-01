@@ -120,7 +120,7 @@ function calculateScore() {
         <!-- Section scores hidden from display -->
     `;
     
-    // Show the user info form for report download immediately after displaying result
+    // Show the user info form for report download
     downloadFullReport();
     document.getElementById('resetButton').style.display = 'inline';
 }
@@ -157,32 +157,34 @@ async function downloadFullReport() {
         overallLabel = 'Portfolio Illusion – You’re Not Diversified, Just Overexposed.';
     }
 
-    // Populate the GHL embedded form fields if they exist
-    const populate = (key, val) => {
-        const el = document.querySelector(`[data-q="${key}"]`);
-        if (el) el.value = val;
-    };
+    const params = new URLSearchParams({
+        overall_score: totalScore,
+        overall_result_text: overallLabel,
+        asset_variety: sectionScores.assetVariety,
+        asset_variety_label: getScoreLabel(sectionScores.assetVariety),
+        risk_correlation: sectionScores.riskCorrelation,
+        risk_correlation_label: getScoreLabel(sectionScores.riskCorrelation),
+        liquidity_cash_flow: sectionScores.liquidityCashFlow,
+        liquidity_cash_flow_label: getScoreLabel(sectionScores.liquidityCashFlow),
+        market_exposure: sectionScores.marketExposure,
+        market_exposure_label: getScoreLabel(sectionScores.marketExposure),
+        alternative_investments: sectionScores.alternativeInvestments,
+        alternative_investments_label: getScoreLabel(sectionScores.alternativeInvestments)
+    });
 
-    populate('overall_score', totalScore);
-    populate('overall_percentage', ((totalScore / maxTotalScore) * 100).toFixed(1));
-    populate('overall_result_text', overallLabel);
-    populate('asset_variety_score', sectionScores.assetVariety);
-    populate('asset_variety_percentage', ((sectionScores.assetVariety / 40) * 100).toFixed(1));
-    populate('asset_variety_label', getScoreLabel(sectionScores.assetVariety));
-    populate('risk_correlation_score', sectionScores.riskCorrelation);
-    populate('risk_correlation_percentage', ((sectionScores.riskCorrelation / 40) * 100).toFixed(1));
-    populate('risk_correlation_label', getScoreLabel(sectionScores.riskCorrelation));
-    populate('liquidity_cash_flow_score', sectionScores.liquidityCashFlow);
-    populate('liquidity_cash_flow_percentage', ((sectionScores.liquidityCashFlow / 40) * 100).toFixed(1));
-    populate('liquidity_cash_flow_label', getScoreLabel(sectionScores.liquidityCashFlow));
-    populate('market_exposure_score', sectionScores.marketExposure);
-    populate('market_exposure_percentage', ((sectionScores.marketExposure / 40) * 100).toFixed(1));
-    populate('market_exposure_label', getScoreLabel(sectionScores.marketExposure));
-    populate('alternative_investments_score', sectionScores.alternativeInvestments);
-    populate('alternative_investments_percentage', ((sectionScores.alternativeInvestments / 40) * 100).toFixed(1));
-    populate('alternative_investments_label', getScoreLabel(sectionScores.alternativeInvestments));
+    const iframe = document.getElementById("inline-cWGOs5Xx8x1w2ieMcDWo");
+    if (iframe) {
+        iframe.src = `https://api.leadconnectorhq.com/widget/form/cWGOs5Xx8x1w2ieMcDWo?${params.toString()}`;
+        console.log("Updated iframe src with query params:", iframe.src);
+        // Log each query parameter to validate form injection
+        params.forEach((value, key) => {
+            console.log(`Injected into form: ${key} = ${value}`);
+        });
+    } else {
+        console.warn("GHL iframe not found.");
+    }
 
-    // Unhide form container
+    // Show container if it's hidden
     const formContainer = document.getElementById("downloadContainer");
     if (formContainer) formContainer.style.display = "block";
 }
