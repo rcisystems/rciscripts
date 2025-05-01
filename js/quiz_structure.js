@@ -172,19 +172,17 @@ async function downloadFullReport() {
         alternative_investments_label: getScoreLabel(sectionScores.alternativeInvestments)
     });
 
-    const iframe = document.getElementById("inline-cWGOs5Xx8x1w2ieMcDWo");
-    if (iframe) {
+    const container = document.getElementById("downloadContainer");
+    if (container) {
+        container.innerHTML = ""; // Clear any previous iframe
+        const iframe = document.createElement("iframe");
         iframe.src = `https://api.leadconnectorhq.com/widget/form/cWGOs5Xx8x1w2ieMcDWo?${params.toString()}`;
-        console.log("Updated iframe src with query params:", iframe.src);
-        // Log each query parameter to validate form injection
-        params.forEach((value, key) => {
-            console.log(`Injected into form: ${key} = ${value}`);
-        });
-    } else {
-        console.warn("GHL iframe not found.");
+        iframe.id = "inline-cWGOs5Xx8x1w2ieMcDWo";
+        iframe.style.width = "100%";
+        iframe.style.height = "1000px";
+        iframe.style.border = "none";
+        container.appendChild(iframe);
+        container.style.display = "block";
+        console.log("Dynamically inserted iframe with:", iframe.src);
     }
-
-    // Show container if it's hidden
-    const formContainer = document.getElementById("downloadContainer");
-    if (formContainer) formContainer.style.display = "block";
 }
