@@ -117,37 +117,12 @@ function calculateScore() {
         <h2>Your Diversification Results</h2>
         <h3>Overall Score: ${totalScore} / ${maxTotalScore} (${totalPercentage.toFixed(1)}%)</h3>
         <p style="margin-bottom: 20px;">${resultText}</p>
-        <h3>Section Scores:</h3>
-        <ul style="list-style: none; padding-left: 0; margin-bottom: 20px;">
-            <li><strong>Asset Variety:</strong> 
-                <span style="color:${getScoreColor(sectionScores.assetVariety)};">
-                    ${sectionScores.assetVariety} / 40 (${getScoreLabel(sectionScores.assetVariety)})
-                </span>
-            </li>
-            <li><strong>Risk Correlation:</strong> 
-                <span style="color:${getScoreColor(sectionScores.riskCorrelation)};">
-                    ${sectionScores.riskCorrelation} / 40 (${getScoreLabel(sectionScores.riskCorrelation)})
-                </span>
-            </li>
-            <li><strong>Liquidity & Cash Flow:</strong> 
-                <span style="color:${getScoreColor(sectionScores.liquidityCashFlow)};">
-                    ${sectionScores.liquidityCashFlow} / 40 (${getScoreLabel(sectionScores.liquidityCashFlow)})
-                </span>
-            </li>
-            <li><strong>Market Exposure:</strong> 
-                <span style="color:${getScoreColor(sectionScores.marketExposure)};">
-                    ${sectionScores.marketExposure} / 40 (${getScoreLabel(sectionScores.marketExposure)})
-                </span>
-            </li>
-            <li><strong>Alternative Investments:</strong> 
-                <span style="color:${getScoreColor(sectionScores.alternativeInvestments)};">
-                    ${sectionScores.alternativeInvestments} / 40 (${getScoreLabel(sectionScores.alternativeInvestments)})
-                </span>
-            </li>
-        </ul>
+        <!-- Section scores hidden from display -->
         <button type="button" id="restartQuiz" onclick="resetQuiz()">Restart Quiz</button>
     `;
     
+    // Show the user info form for report download immediately after displaying result
+    downloadFullReport();
     document.getElementById('resetButton').style.display = 'inline';
 }
 
@@ -161,3 +136,54 @@ function resetQuiz() {
 }
 
 document.addEventListener("DOMContentLoaded", () => showQuestion(0));
+
+// Add pdf-lib support
+async function downloadFullReport() {
+    const totalScore = sectionScores.assetVariety + sectionScores.riskCorrelation + sectionScores.liquidityCashFlow + sectionScores.marketExposure + sectionScores.alternativeInvestments;
+    const maxTotalScore = 200;
+
+    function getScoreLabel(score) {
+        if (score >= 32) return 'Strong';
+        if (score >= 24) return 'Moderate';
+        if (score >= 12) return 'Needs Improvement';
+        return 'Weak';
+    }
+
+    let overallLabel = '';
+    if (totalScore / maxTotalScore >= 0.8) {
+        overallLabel = 'True Diversification – You’re Ahead of the Game!';
+    } else if (totalScore / maxTotalScore >= 0.5) {
+        overallLabel = 'Moderately Diversified – But You Have Gaps.';
+    } else {
+        overallLabel = 'Portfolio Illusion – You’re Not Diversified, Just Overexposed.';
+    }
+
+    // Populate the GHL embedded form fields if they exist
+    const populate = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.value = val;
+    };
+
+    populate('overall_score', totalScore);
+    populate('overall_percentage', ((totalScore / maxTotalScore) * 100).toFixed(1));
+    populate('overall_result_text', overallLabel);
+    populate('asset_variety_score', sectionScores.assetVariety);
+    populate('asset_variety_percentage', ((sectionScores.assetVariety / 40) * 100).toFixed(1));
+    populate('asset_variety_label', getScoreLabel(sectionScores.assetVariety));
+    populate('risk_correlation_score', sectionScores.riskCorrelation);
+    populate('risk_correlation_percentage', ((sectionScores.riskCorrelation / 40) * 100).toFixed(1));
+    populate('risk_correlation_label', getScoreLabel(sectionScores.riskCorrelation));
+    populate('liquidity_cash_flow_score', sectionScores.liquidityCashFlow);
+    populate('liquidity_cash_flow_percentage', ((sectionScores.liquidityCashFlow / 40) * 100).toFixed(1));
+    populate('liquidity_cash_flow_label', getScoreLabel(sectionScores.liquidityCashFlow));
+    populate('market_exposure_score', sectionScores.marketExposure);
+    populate('market_exposure_percentage', ((sectionScores.marketExposure / 40) * 100).toFixed(1));
+    populate('market_exposure_label', getScoreLabel(sectionScores.marketExposure));
+    populate('alternative_investments_score', sectionScores.alternativeInvestments);
+    populate('alternative_investments_percentage', ((sectionScores.alternativeInvestments / 40) * 100).toFixed(1));
+    populate('alternative_investments_label', getScoreLabel(sectionScores.alternativeInvestments));
+
+    // Unhide form container
+    const formContainer = document.getElementById("downloadContainer");
+    if (formContainer) formContainer.style.display = "block";
+}
