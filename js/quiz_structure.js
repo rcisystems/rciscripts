@@ -114,9 +114,11 @@ function calculateScore() {
                      "Portfolio Illusion – You’re Not Diversified, Just Overexposed.";
     
     document.getElementById("result").innerHTML = `
-        <h2>Your Diversification Results</h2>
-        <h3>Overall Score: ${totalScore} / ${maxTotalScore} (${totalPercentage.toFixed(1)}%)</h3>
-        <p style="margin-bottom: 20px;">${resultText}</p>
+        <h3>Your Diversification Results</h3>
+        <h2>Overall Score: ${totalScore} / ${maxTotalScore} (${totalPercentage.toFixed(1)}%)</h2>
+        <h4 style="margin-bottom: 20px;">${resultText}</h4>
+        <p>We’ll email your full report including your scores, insights, and personalized recommendations. </p>
+        <p style="margin-bottom: 20px;"> Just fill out the form below to get it delivered to your inbox.</p>
         <!-- Section scores hidden from display -->
     `;
     
