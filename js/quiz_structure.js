@@ -123,7 +123,11 @@ function calculateScore() {
     `;
     
     // Show the user info form for report download
-    downloadFullReport();
+    const scoreBtn = document.getElementById("submitButton");
+    if (scoreBtn) {
+        scoreBtn.textContent = "Get My Full Report";
+        scoreBtn.onclick = downloadFullReport;
+    }
     document.getElementById('resetButton').style.display = 'inline';
 }
 
@@ -185,6 +189,7 @@ async function downloadFullReport() {
         iframe.style.border = "none";
         container.appendChild(iframe);
         container.style.display = "block";
+        container.scrollIntoView({ behavior: 'smooth' });
         console.log("Dynamically inserted iframe with:", iframe.src);
     }
 }
