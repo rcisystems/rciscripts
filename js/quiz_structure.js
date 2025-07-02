@@ -123,11 +123,7 @@ function calculateScore() {
     `;
     
     // Show the user info form for report download
-    const scoreBtn = document.getElementById("submitButton");
-    if (scoreBtn) {
-        scoreBtn.textContent = "Get My Full Report";
-        scoreBtn.onclick = downloadFullReport;
-    }
+    downloadFullReport();
     document.getElementById('resetButton').style.display = 'inline';
 }
 
