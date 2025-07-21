@@ -14,6 +14,10 @@ const sheetUrl = "https://script.google.com/macros/s/AKfycbx303zczPC-AcXwbpoZg-N
       document.getElementById("events-list").classList.add("hidden");
 
       const res = await fetch(sheetUrl);
+      console.log("Fetch response status:", res.status);
+      const json = await res.json();
+      console.log("Fetched data:", json);
+      allEvents = json;
       allEvents = await res.json();
       allEvents = allEvents
         .filter(e => e["Start Date"])
