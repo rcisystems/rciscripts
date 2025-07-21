@@ -7,6 +7,7 @@ const sheetUrl = "https://script.google.com/macros/s/AKfycbx303zczPC-AcXwbpoZg-N
   let currentPage = 1;
   let map, streetLayer, satelliteLayer, baseMaps, markersGroup;
   const locationCache = {}; // Cache geocoded locations
+  let mapInteractionStarted = false;
 
   async function loadEvents() {
     try {
@@ -101,7 +102,11 @@ const sheetUrl = "https://script.google.com/macros/s/AKfycbx303zczPC-AcXwbpoZg-N
       const dateMatch = !date || (e["Start Date"] && e["Start Date"].startsWith(date));
       const pastMatch = showPast || !isEventPast(e);
       const isPast = isEventPast(e);
-      const timeMatch = (timeToggle === "past" && isPast) || (timeToggle === "upcoming" && !isPast);
+      const timeMatch =
+        timeToggle === "all" ||
+        (timeToggle === "past" && isPast) ||
+        (timeToggle === "upcoming" && !isPast) ||
+        showPast;
 
       return textMatch && locMatch && dateMatch && pastMatch && timeMatch;
     });
@@ -190,6 +195,99 @@ const sheetUrl = "https://script.google.com/macros/s/AKfycbx303zczPC-AcXwbpoZg-N
     updateMapMarkers();
   }
 
+  function renderEventsSubset(events) {
+  const list = document.getElementById("events-list");
+  list.innerHTML = "";
+
+  const start = (currentPage - 1) * EVENTS_PER_PAGE;
+  const end = start + EVENTS_PER_PAGE;
+  const pageEvents = events.slice(start, end);
+
+  if (pageEvents.length === 0) {
+    list.innerHTML = "<p>No events found in this area.</p>";
+    document.getElementById("pagination").innerHTML = "";
+    return;
+  }
+
+  pageEvents.forEach(event => {
+    const div = document.createElement("div");
+    div.className = "event";
+
+    if (isToday(event)) {
+      div.classList.add("today-highlight");
+    }
+
+    const logo = event["Logo Link"]
+      ? `<img src="${event["Logo Link"]}" alt="Logo" class="event-logo">`
+      : "";
+
+    const regLink = event["Registration Link"]
+      ? `<a class="registration-link" href="${event["Registration Link"]}" target="_blank">Register Here</a>`
+      : "";
+
+    const eventLink = event["Event Link"]
+      ? `<a class="event-link" href="${event["Event Link"]}" target="_blank">More Info</a>`
+      : "";
+
+    const startDate = formatDate(event["Start Date"]);
+    const endDate = event["End Date"] ? formatDate(event["End Date"]) : startDate;
+    const startTime = formatTime(event["Start Date"]);
+
+    let dateDisplay = `<div><strong>Date:</strong> ${startDate}`;
+    if (startDate !== endDate) {
+      dateDisplay += ` - ${endDate}`;
+    }
+    dateDisplay += `</div>`;
+
+    const timeDisplay = `<div><strong>Start Time:</strong> ${startTime}</div>`;
+
+    div.innerHTML = `
+      ${logo}
+      <div class="event-title">${event["Title"]}</div>
+      ${dateDisplay}
+      ${timeDisplay}
+      <div><strong>Location:</strong> ${event["Location"] || "TBD"}</div>
+      <div class="event-description">${event["Description"] || ""}</div>
+      <div class="event-links">
+        ${regLink}
+        ${eventLink}
+      </div>
+    `;
+
+    div.addEventListener("click", () => {
+      if (event["Event Link"]) {
+        window.open(event["Event Link"], "_blank");
+      } else {
+        document.getElementById("calendar-iframe").scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+
+    list.appendChild(div);
+  });
+
+  document.getElementById("spinner").classList.add("hidden");
+  document.getElementById("events-list").classList.remove("hidden");
+
+  renderPaginationSubset(events);
+}
+
+function renderPaginationSubset(events) {
+  const totalPages = Math.ceil(events.length / EVENTS_PER_PAGE);
+  const container = document.getElementById("pagination");
+  container.innerHTML = "";
+
+  for (let i = 1; i <= totalPages; i++) {
+    const btn = document.createElement("button");
+    btn.textContent = i;
+    if (i === currentPage) btn.style.background = "#0056b3";
+    btn.addEventListener("click", () => {
+      currentPage = i;
+      renderEventsSubset(events);
+    });
+    container.appendChild(btn);
+  }
+}
+
   function renderPagination() {
     const totalPages = Math.ceil(filteredEvents.length / EVENTS_PER_PAGE);
     const container = document.getElementById("pagination");
@@ -232,6 +330,33 @@ const sheetUrl = "https://script.google.com/macros/s/AKfycbx303zczPC-AcXwbpoZg-N
 
     markersGroup = L.markerClusterGroup();
     map.addLayer(markersGroup);
+    map.on("moveend", () => {
+      if (!mapInteractionStarted) {
+        mapInteractionStarted = true;
+      }
+      filterByMapBounds();
+    });
+  }
+
+  function filterByMapBounds() {
+    if (!map || !map.getBounds) return;
+
+    // ✅ If no interaction yet, show ALL filteredEvents (even those without coordinates)
+    if (!mapInteractionStarted) {
+      renderEvents(); // this includes all filteredEvents
+      return;
+    }
+
+    // ✅ After interaction, show only events with coordinates inside the visible map
+    const bounds = map.getBounds();
+    const eventsInView = filteredEvents.filter(event => {
+      const lat = parseFloat(event["Latitude"]);
+      const lon = parseFloat(event["Longitude"]);
+      return !isNaN(lat) && !isNaN(lon) && bounds.contains([lat, lon]);
+    });
+
+    currentPage = 1;
+    renderEventsSubset(eventsInView);
   }
 
   function updateMapMarkers() {
