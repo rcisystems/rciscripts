@@ -17,8 +17,13 @@ const sheetUrl = "https://script.google.com/macros/s/AKfycbx303zczPC-AcXwbpoZg-N
       console.log("Fetch response status:", res.status);
       const json = await res.json();
       console.log("Fetched data:", json);
-      allEvents = json;
-      allEvents = await res.json();
+      allEvents = json.map(event => {
+        const cleaned = {};
+        Object.entries(event).forEach(([key, val]) => {
+          cleaned[key.trim()] = val;
+        });
+        return cleaned;
+      });
       allEvents = allEvents
         .filter(e => e["Start Date"])
         .map(e => ({
@@ -230,69 +235,50 @@ const sheetUrl = "https://script.google.com/macros/s/AKfycbx303zczPC-AcXwbpoZg-N
   }
 
   function updateMapMarkers() {
-    const spinner = document.getElementById("map-spinner");
-    if (spinner) {
-      spinner.classList.remove("hidden");
-    }
-  
-    if (!map || !markersGroup) return;
-  
-    markersGroup.clearLayers();
-    const bounds = L.latLngBounds([]);
-    const promises = [];
-  
-    const trophyIcon = L.icon({
-      iconUrl: 'https://cdn-icons-png.flaticon.com/512/1828/1828884.png',
-      iconSize: [30, 30],
-      iconAnchor: [15, 30],
-      popupAnchor: [0, -30],
-    });
-  
-    const start = (currentPage - 1) * EVENTS_PER_PAGE;
-    const end = start + EVENTS_PER_PAGE;
-    const pageEvents = filteredEvents.slice(start, end);
-  
-    pageEvents.forEach(event => {
-      if (!event["Location"]) return;
-  
-      if (locationCache[event["Location"]]) {
-        const { lat, lon } = locationCache[event["Location"]];
-        const marker = L.marker([lat, lon], { icon: trophyIcon }).bindPopup(event["Title"]);
-        marker.on("click", () => {
-          document.getElementById("search").value = event["Title"];
-          applyFilters();
-        });
-        markersGroup.addLayer(marker);
-        bounds.extend([lat, lon]);
-      } else {
-        const p = fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(event["Location"])}`)
-          .then(res => res.json())
-          .then(data => {
-            if (data.length > 0) {
-              const { lat, lon } = data[0];
-              locationCache[event["Location"]] = { lat, lon };
-              const marker = L.marker([lat, lon], { icon: trophyIcon }).bindPopup(event["Title"]);
-              marker.on("click", () => {
-                document.getElementById("search").value = event["Title"];
-                applyFilters();
-              });
-              markersGroup.addLayer(marker);
-              bounds.extend([lat, lon]);
-            }
-          });
-        promises.push(p);
-      }
-    });
-  
-    Promise.all(promises).then(() => {
-      if (bounds.isValid()) {
-        map.fitBounds(bounds);
-      }
-      if (spinner) {
-        spinner.classList.add("hidden");
-      }
-    });
+  const spinner = document.getElementById("map-spinner");
+  if (spinner) {
+    spinner.classList.remove("hidden");
   }
+
+  if (!map || !markersGroup) return;
+
+  markersGroup.clearLayers();
+  const bounds = L.latLngBounds([]);
+
+  const fishIcon = L.icon({
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/616/616408.png',
+    iconSize: [30, 30],
+    iconAnchor: [15, 30],
+    popupAnchor: [0, -30],
+  });
+
+  const start = (currentPage - 1) * EVENTS_PER_PAGE;
+  const end = start + EVENTS_PER_PAGE;
+  const pageEvents = filteredEvents.slice(start, end);
+
+  pageEvents.forEach(event => {
+    const lat = parseFloat(event["Latitude"]);
+    const lon = parseFloat(event["Longitude"]);
+    console.log("Placing marker:", event["Title"], lat, lon);
+    if (!isNaN(lat) && !isNaN(lon)) {
+      const marker = L.marker([lat, lon], { icon: fishIcon }).bindPopup(event["Title"]);
+      marker.on("click", () => {
+        document.getElementById("search").value = event["Title"];
+        applyFilters();
+      });
+      markersGroup.addLayer(marker);
+      bounds.extend([lat, lon]);
+    }
+  });
+
+  if (bounds.isValid()) {
+    map.fitBounds(bounds);
+  }
+
+  if (spinner) {
+    spinner.classList.add("hidden");
+  }
+}
 
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
