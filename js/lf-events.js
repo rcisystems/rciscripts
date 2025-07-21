@@ -246,7 +246,7 @@ const sheetUrl = "https://script.google.com/macros/s/AKfycbx303zczPC-AcXwbpoZg-N
   const bounds = L.latLngBounds([]);
 
   const fishIcon = L.icon({
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/616/616408.png',
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/17437/17437438.png',
     iconSize: [30, 30],
     iconAnchor: [15, 30],
     popupAnchor: [0, -30],
