@@ -11,31 +11,31 @@ async function generatePDF() {
   const downloadContainer = getRequiredEl('download-container');
   const prevDisplay = downloadContainer.style.display;
   downloadContainer.style.display = 'none';
-
+  
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF('p', 'pt', 'letter');
   const pageWidth = doc.internal.pageSize.getWidth();
-
+  
   try {
     // Page 1: Summary and charts
     const page1 = getRequiredEl('pdf-page1');
     const canvas1 = await html2canvas(page1, { scale: 0.5, width: pageWidth - 40 });
-    const imgData1 = canvas1.toDataURL('image/png');
+    const imgData1 = canvas1.toDataURL('image/jpeg', 1.0);
     const imgProps1 = doc.getImageProperties(imgData1);
     const imgHeight1 = (imgProps1.height * (pageWidth - 40)) / imgProps1.width;
-    doc.addImage(imgData1, 'PNG', 20, 20, pageWidth - 40, imgHeight1);
-
+    doc.addImage(imgData1, 'JPEG', 20, 20, pageWidth - 40, imgHeight1);
+    
     // Page break
     doc.addPage();
-
+    
     // Page 2: Amortization table
     const page2 = getRequiredEl('pdf-page2');
     const canvas2 = await html2canvas(page2, { scale: 0.5, width: pageWidth - 40 });
-    const imgData2 = canvas2.toDataURL('image/png');
+    const imgData2 = canvas2.toDataURL('image/jpeg', 1.0);
     const imgProps2 = doc.getImageProperties(imgData2);
     const imgHeight2 = (imgProps2.height * (pageWidth - 40)) / imgProps2.width;
-    doc.addImage(imgData2, 'PNG', 20, 20, pageWidth - 40, imgHeight2);
-
+    doc.addImage(imgData2, 'JPEG', 20, 20, pageWidth - 40, imgHeight2);
+    
     // Save PDF
     doc.save('SDIRA_Results.pdf');
   } catch (error) {
@@ -65,11 +65,11 @@ function initResultsPage() {
   // Retrieve amortization data from sessionStorage
   const amortData = JSON.parse(sessionStorage.getItem('amortData') || '[]');
   console.log('DEBUG: amortData from sessionStorage:', amortData);
-
+  
   // Cache progress bar elements
   const fillEl = document.getElementById('progress-bar-fill');
   const textEl = document.getElementById('progress-text');
-
+  
   // Render retirement savings progress bar
   const inputs = JSON.parse(sessionStorage.getItem('inputParams') || '{}');
   console.log('DEBUG: inputs from sessionStorage:', inputs);
@@ -80,19 +80,19 @@ function initResultsPage() {
       const target = targetRow.endingBalance;
       const rawPercent = target > 0 ? (current / target) * 100 : 0;
       const clampedPercent = Math.min(Math.max(rawPercent, 0), 100);
-
+      
       if (fillEl) {
         fillEl.style.width = clampedPercent + '%';
       }
       if (textEl) {
         const message = rawPercent > 100
-          ? `${Math.floor(rawPercent)}% funded (Surpassed goal!)`
-          : `${Math.floor(clampedPercent)}% funded`;
+        ? `${Math.floor(rawPercent)}% funded (Surpassed goal!)`
+        : `${Math.floor(clampedPercent)}% funded`;
         textEl.textContent = message;
       }
     }
   }
-
+  
   // ==== Summary Section ====
   const planEl   = document.getElementById('plan-sustainability');
   const runOutEl = document.getElementById('run-out-age');
@@ -108,7 +108,7 @@ function initResultsPage() {
     recEl.textContent    = findRecommendedRetirementAge(inputs);
     totalEl.textContent  = `$${totalNeeded.toLocaleString()}`;
   }
-
+  
   // Render amortization table
   const table = document.getElementById('amortization-schedule');
   console.log('DEBUG: About to render table, table element:', table);
@@ -122,8 +122,8 @@ function initResultsPage() {
       const desc = getRowDescription(row);
       const titleAttr = desc ? ` title="${desc}"` : '';
       const cls = row.endingBalance <= 0
-        ? 'highlight-red'
-        : (row.annualWithdrawal > row.earnings ? 'highlight-yellow' : '');
+      ? 'highlight-red'
+      : (row.annualWithdrawal > row.earnings ? 'highlight-yellow' : '');
       return `
         <tr${cls ? ` class="${cls}"` : ''}${titleAttr}>
           <td>${row.age}</td>
@@ -153,7 +153,7 @@ function initResultsPage() {
     table.innerHTML = html;
     console.log('DEBUG: Amortization table HTML set');
   }
-
+  
   // Render charts
   console.log('DEBUG: About to parse chartData');
   const chartData = JSON.parse(sessionStorage.getItem('chartData') || '{}');
@@ -194,44 +194,44 @@ function initResultsPage() {
           label: 'Annual Withdrawal ($)',
           data: chartData.balances.map((bal, i) =>
             bal === 0 ? 0 : chartData.withdrawals[i]
-          ),
-          yAxisID: 'y1',
-          backgroundColor: chartData.withdrawals.map((w, i) =>
-            w > chartData.incomes[i] ? '#f8e8a2f1' : undefined
-          ),
-        }
-      ]
-    },
-    options: {
-      scales: {
-        x: { title: { display: true, text: 'Age' } },
-        y: {
-          type: 'linear',
-          position: 'left',
-          title: { display: true, text: 'Amount ($)' },
-          beginAtZero: true
-        },
-        y1: {
-          type: 'linear',
-          position: 'right',
-          grid: { drawOnChartArea: false },
-          title: { display: true, text: 'Amount ($)' },
-          beginAtZero: true
-        }
-      }
+        ),
+        yAxisID: 'y1',
+        backgroundColor: chartData.withdrawals.map((w, i) =>
+          w > chartData.incomes[i] ? '#f8e8a2f1' : undefined
+      ),
     }
-  }));
+  ]
+},
+options: {
+  scales: {
+    x: { title: { display: true, text: 'Age' } },
+    y: {
+      type: 'linear',
+      position: 'left',
+      title: { display: true, text: 'Amount ($)' },
+      beginAtZero: true
+    },
+    y1: {
+      type: 'linear',
+      position: 'right',
+      grid: { drawOnChartArea: false },
+      title: { display: true, text: 'Amount ($)' },
+      beginAtZero: true
+    }
+  }
+}
+}));
 
-  // Add Download PDF button
-  const downloadContainer = getRequiredEl('download-container');
-  console.log('DEBUG: About to add Download PDF button');
-  console.log('DEBUG: downloadContainer:', downloadContainer);
-  downloadContainer.innerHTML = '';
-  const pdfButton = document.createElement('button');
-  pdfButton.textContent = 'Download PDF';
-  pdfButton.onclick = generatePDF;
-  downloadContainer.appendChild(pdfButton);
-  console.log('DEBUG: Download button appended');
+// Add Download PDF button
+const downloadContainer = getRequiredEl('download-container');
+console.log('DEBUG: About to add Download PDF button');
+console.log('DEBUG: downloadContainer:', downloadContainer);
+downloadContainer.innerHTML = '';
+const pdfButton = document.createElement('button');
+pdfButton.textContent = 'Download PDF';
+pdfButton.onclick = generatePDF;
+downloadContainer.appendChild(pdfButton);
+console.log('DEBUG: Download button appended');
 }
 
 // Hook init to DOM ready or run immediately
