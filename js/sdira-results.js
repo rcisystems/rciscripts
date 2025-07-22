@@ -7,31 +7,26 @@ function getRequiredEl(id) {
 }
 
 // PDF generation using jsPDF
-function generatePDF() {
+async function generatePDF() {
   // Temporarily hide download button during PDF rendering
   const downloadContainer = getRequiredEl('download-container');
   let prevDisplay = downloadContainer.style.display;
   downloadContainer.style.display = 'none';
 
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF('p', 'pt', 'a4');
+  const doc = new jsPDF('p', 'pt', 'letter');
   try {
-    const containerEl = document.getElementById('results-container');
-    doc.html(containerEl, {
-      callback: function (pdf) {
-        pdf.save('SDIRA_Results.pdf');
-        // Restore the download button display
-        if (downloadContainer) {
-          downloadContainer.style.display = prevDisplay || '';
-        }
-      },
-      x: 20,
-      y: 20,
-      html2canvas: {
-        scale: 0.5,
-        width: 550
-      }
-    });
+    // Page 1: summary and charts
+    const page1 = document.getElementById('pdf-page1');
+    await doc.html(page1, { x:20, y:20, html2canvas:{ scale:0.5, width:550 } });
+    doc.addPage();
+    // Page 2: amortization table
+    const page2 = document.getElementById('pdf-page2');
+    await doc.html(page2, { x:20, y:20, html2canvas:{ scale:0.5, width:550 } });
+    // Save after both pages
+    doc.save('SDIRA_Results.pdf');
+    // Restore button
+    if (downloadContainer) downloadContainer.style.display = prevDisplay || '';
   } catch(error) {
     console.error('PDF generation failed:', error);
     alert('Could not generate PDF: ' + error.message);
