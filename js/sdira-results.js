@@ -152,6 +152,27 @@ function initResultsPage() {
   console.log('DEBUG: About to parse chartData');
   const chartData = JSON.parse(sessionStorage.getItem('chartData') || '{}');
   console.log('DEBUG: chartData:', chartData);
+  // Render Balance Over Time line chart
+  console.log('DEBUG: Calling renderOrUpdateChart for balanceChart');
+  renderOrUpdateChart('balanceChart', () => ({
+    type: 'line',
+    data: {
+      labels: chartData.ages,
+      datasets: [{
+        label: 'Ending Balance ($)',
+        data: chartData.balances,
+        fill: false,
+        tension: 0.1
+      }]
+    },
+    options: {
+      scales: {
+        x: { title: { display: true, text: 'Age' } },
+        y: { title: { display: true, text: 'Ending Balance ($)' }, beginAtZero: true }
+      }
+    }
+  }));
+  console.log('DEBUG: Balance Over Time chart rendered');
   console.log('DEBUG: Calling renderOrUpdateChart for incomeWithdrawalChart');
   renderOrUpdateChart('incomeWithdrawalChart', () => ({
     type: 'bar',
