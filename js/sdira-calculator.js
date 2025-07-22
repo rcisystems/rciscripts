@@ -13,28 +13,27 @@ function calculateRetirement() {
 
     // Gather inputs
     const inputs = getInputs();
-    console.log("User Inputs:", inputs);
-
     validateInputs(inputs);
-    console.log("Inputs validated successfully");
 
     let balance = inputs.currentBalance;
     let runOutOfMoneyAge = null;
     let isSelfSustaining = true;
 
     const scheduleTable = document.getElementById("amortization-schedule");
-    scheduleTable.innerHTML = `
-            <tr>
-                <th>Age</th>
-                <th>Yearly Income</th>
-                <th>Beginning Balance</th>
-                <th>Earnings</th>
-                <th>Est Annual Savings</th>
-                <th>Annual Withdrawal</th>
-                <th>Ending Balance</th>
-                <th>Withdrawal Rate (%)</th>
-            </tr>
-        `;
+    if (scheduleTable) {
+      scheduleTable.innerHTML = `
+              <tr>
+                  <th>Age</th>
+                  <th>Yearly Income</th>
+                  <th>Beginning Balance</th>
+                  <th>Earnings</th>
+                  <th>Est Annual Savings</th>
+                  <th>Annual Withdrawal</th>
+                  <th>Ending Balance</th>
+                  <th>Withdrawal Rate (%)</th>
+              </tr>
+          `;
+    }
 
     // Calculate initial withdrawal and simulate the plan
     const initialWithdrawal = Math.ceil(
@@ -115,76 +114,76 @@ function calculateRetirement() {
       });
 
       // Update the table
-      scheduleTable.innerHTML += `
-          <tr class="${rowClass}">
-              <td>${age}</td>
-              <td>${
-                isRetired && annualWithdrawal > 0
-                  ? "0"
-                  : yearlyIncome.toLocaleString()
-              }</td>
-              <td>${Math.max(0, beginningBalance).toLocaleString()}</td>
-              <td>${Math.max(0, earnings).toLocaleString()}</td>
-              <td>${annualSavings.toLocaleString()}</td>
-              <td>${annualWithdrawal.toLocaleString()}</td>
-              <td>${Math.max(0, balance).toLocaleString()}</td>
-              <td>${withdrawalRate.toFixed(2)}%</td>
-          </tr>
-      `;
+      if (scheduleTable) {
+        scheduleTable.innerHTML += `
+                  <tr class="${rowClass}">
+                      <td>${age}</td>
+                      <td>${
+                        isRetired && annualWithdrawal > 0
+                          ? "0"
+                          : yearlyIncome.toLocaleString()
+                      }</td>
+                      <td>${Math.max(0, beginningBalance).toLocaleString()}</td>
+                      <td>${Math.max(0, earnings).toLocaleString()}</td>
+                      <td>${annualSavings.toLocaleString()}</td>
+                      <td>${annualWithdrawal.toLocaleString()}</td>
+                      <td>${Math.max(0, balance).toLocaleString()}</td>
+                      <td>${withdrawalRate.toFixed(2)}%</td>
+                  </tr>
+              `;
+      }
     }
 
-    let recommendedAge = inputs.retirementAge;
+    // Store amortization and chart data for results page
+    sessionStorage.setItem('amortData', JSON.stringify(data));
+    sessionStorage.setItem('chartData', JSON.stringify({
+      ages: data.map(r => r.age),
+      balances: data.map(r => r.endingBalance),
+      incomes: data.map(r => r.yearlyIncome),
+      withdrawals: data.map(r => r.annualWithdrawal)
+    }));
+    sessionStorage.setItem('inputParams', JSON.stringify(inputs));
 
-    // Determine the recommended age if the plan is unsustainable
-    if (!isSelfSustaining) {
-      console.log(
-        "Plan is unsustainable. Calculating recommended retirement age..."
-      );
-      recommendedAge = findRecommendedRetirementAge(inputs);
+    // Reveal the "View Results" button
+    const viewBtn = document.getElementById('view-results-btn');
+    if (viewBtn) {
+      viewBtn.style.display = 'inline-block';
+      viewBtn.onclick = () => {
+        window.location.href = 'results.html';
+      };
     }
-    
-    // Ensure totalAmountNeeded is valid
-    if (!totalAmountNeeded || isNaN(totalAmountNeeded) || totalAmountNeeded <= 0) {
-      console.warn("Warning: totalAmountNeeded is invalid, setting default value.");
-      totalAmountNeeded = 1; // Prevents division by zero
+    // Exit so summary and charts aren't rendered here
+    // Populate summary on main page
+    const recommendedAge = isSelfSustaining
+      ? inputs.retirementAge
+      : findRecommendedRetirementAge(inputs);
+    updateSummary(inputs, runOutOfMoneyAge, isSelfSustaining, recommendedAge, totalAmountNeeded);
+
+    const summaryDiv = document.getElementById('summary');
+    if (summaryDiv) {
+      summaryDiv.style.display = 'block';
     }
-
-    console.log(`Total Amount Needed for Retirement: $${totalAmountNeeded.toLocaleString()}`);
-    // Update summary and render charts
-    updateSummary(
-      inputs,
-      runOutOfMoneyAge,
-      isSelfSustaining,
-      recommendedAge,
-      totalAmountNeeded
-    );
-    renderCharts(data);
-
-    // Make "Save Scenario" button and Scenario Comparison Table visible
-    document.getElementById("save-scenario").style.display = "block";
-    document.getElementById("scenario-comparison-container").style.display = "block";
-
-    // Add recalculate button if the plan is unsustainable
-    const recalculateButton = document.getElementById("recalculate-button");
-    recalculateButton.innerHTML = ""; // Clear existing button
-
-    if (!isSelfSustaining) {
-      recalculateButton.innerHTML = `
-                <button onclick="recalculateWithRecommendedAge(${recommendedAge})">
-                    Recalculate with Recommended Retirement Age (${recommendedAge})
-                </button>
-            `;
+    // Show recalculate button if plan is unsustainable
+    const recalcDiv = document.getElementById('recalculate-button');
+    if (recalcDiv) {
+      recalcDiv.innerHTML = ''; 
+      if (!isSelfSustaining) {
+        recalcDiv.style.display = 'block'; 
+        recalcDiv.innerHTML = `<button onclick="recalculateWithRecommendedAge(${recommendedAge})">
+          Recalculate with Recommended Retirement Age (${recommendedAge})
+        </button>`;
+      } else {
+        recalcDiv.style.display = 'none';
+      }
     }
+    return;
 
-    // Add download button only after successful calculation
-    addDownloadButton(totalAmountNeeded);
   } catch (error) {
     // Clear any existing download button if calculation fails
     const pdfContainer = document.getElementById("pdf-download-container");
     if (pdfContainer) {
       pdfContainer.innerHTML = "";
     }
-    
 
     console.error(
       "An error occurred during retirement calculation:",
@@ -375,176 +374,25 @@ function recalculateWithRecommendedAge(recommendedAge) {
 }
 
 function updateSummary(
-  inputs,
-  runOutOfMoneyAge,
-  isSelfSustaining,
-  recommendedAge,
-  totalAmountNeeded
-) {
+    inputs,
+    runOutOfMoneyAge,
+    isSelfSustaining,
+    recommendedAge,
+    totalAmountNeeded
+  ) {
     const summaryDiv = document.getElementById("summary");
     summaryDiv.innerHTML = `
-        <p><strong>Plan Sustainability:</strong> ${
-          isSelfSustaining ? "Sustainable" : "Unsustainable"
-        }</p>
-        <p><strong>Run Out of Money Age:</strong> ${
-          runOutOfMoneyAge || "Never"
-        }</p>
-        <p><strong>Recommended Retirement Age:</strong> ${recommendedAge}</p>
-        <p><strong>Total Amount Needed for Retirement:</strong> $${totalAmountNeeded.toLocaleString()}</p>
-    `;
-
-    // Calculate progress toward retirement goal
-    let progressPercentage = (inputs.currentBalance / totalAmountNeeded) * 100;
-    progressPercentage = Math.min(progressPercentage, 100); // Cap at 100%
-
-    // Update Progress Bar
-    const progressBarFill = document.getElementById("progress-bar-fill");
-    const progressText = document.getElementById("progress-text");
-
-    progressBarFill.style.width = `${progressPercentage}%`;
-    progressText.innerText = `You have saved ${progressPercentage.toFixed(2)}% of your retirement goal.`;
-
-    // Change progress bar color based on progress
-    if (progressPercentage < 50) {
-        progressBarFill.style.backgroundColor = "#e74c3c"; // Red (low progress)
-    } else if (progressPercentage < 80) {
-        progressBarFill.style.backgroundColor = "#f39c12"; // Orange (moderate progress)
-    } else {
-        progressBarFill.style.backgroundColor = "#2ecc71"; // Green (good progress)
-    }
-}
-
-  // Array to store saved scenarios
-let savedScenarios = [];
-
-// Function to save scenario
-function saveScenario() {
-  try {
-      console.log("Saving scenario...");
-
-      // Get input values
-      const inputs = getInputs();
-      console.log("User Inputs:", inputs);
-
-      validateInputs(inputs);
-      console.log("Inputs validated successfully");
-
-      // Calculate the scenario
-      let balance = inputs.currentBalance;
-      let runOutOfMoneyAge = null;
-      let totalAmountNeeded = 0;
-      let isSelfSustaining = true;
-
-      const initialWithdrawal = inputs.desiredIncome * Math.pow(1 + inputs.costInflation, inputs.retirementAge - inputs.currentAge);
-      console.log("Initial Withdrawal:", initialWithdrawal);
-
-      for (let age = inputs.currentAge; age <= inputs.lifeExpectancy; age++) {
-          const isRetired = age >= inputs.retirementAge;
-          const annualWithdrawal = isRetired 
-              ? Math.max(0, initialWithdrawal - inputs.afterRetIncome) * Math.pow(1 + inputs.costInflation, age - inputs.retirementAge) 
-              : 0;
-
-          balance = balance + (balance * (isRetired ? inputs.postRetReturn : inputs.preRetReturn)) - annualWithdrawal;
-
-          console.log(`Age: ${age}, Balance: ${balance}, Annual Withdrawal: ${annualWithdrawal}`);
-
-          if (isRetired) {
-              totalAmountNeeded += Math.ceil(annualWithdrawal);
-          }
-
-          if (balance < 0 && runOutOfMoneyAge === null) {
-              runOutOfMoneyAge = age;
-              isSelfSustaining = false;
-              console.warn(`Funds run out at Age ${age}`);
-          }
-      }
-
-      // Store scenario
-      const scenario = {
-          id: Date.now(),
-          retirementAge: inputs.retirementAge,
-          afterRetIncome: inputs.afterRetIncome,
-          desiredIncome: inputs.desiredIncome,
-          runOutOfMoneyAge: runOutOfMoneyAge || "Never",
-          totalNeeded: totalAmountNeeded
-      };
-
-      savedScenarios.push(scenario);
-      console.log("Scenario saved:", scenario);
-
-      updateScenarioTable();
-  } catch (error) {
-      console.error("Error in saveScenario():", error);
-      alert(`Error: ${error.message}`);
-  }
-}
-
-// Function to update the scenario comparison table
-function updateScenarioTable() {
-  console.log("Updating Scenario Table...");
-  console.log("Saved Scenarios:", savedScenarios);
-
-  const table = document.getElementById("scenario-comparison");
-
-  if (!table) {
-      console.error("Scenario comparison table not found!");
-      return;
-  }
-
-  // Ensure the table is visible
-  document.getElementById("scenario-comparison-container").style.display = "block";
-
-  // Clear existing rows except for headers
-  table.innerHTML = `
-      <tr>
-          <th>Scenario</th>
-          <th>Retirement Age</th>
-          <th>After Retirement Income</th>
-          <th>Yearly Desired Income</th>
-          <th>Run Out of Money Age</th>
-          <th>Total Needed</th>
-          <th>Delete</th>
-      </tr>
-  `;
-
-  // Check if there are any scenarios
-  if (savedScenarios.length === 0) {
-      console.log("No scenarios to display.");
-      return;
-  }
-
-  // Add saved scenarios
-  savedScenarios.forEach((scenario, index) => {
-      console.log(`Rendering Scenario ${index + 1}:`, scenario);
-
-      const row = document.createElement("tr");
-      row.innerHTML = `
-          <td>Scenario ${index + 1}</td>
-          <td>${scenario.retirementAge}</td>
-          <td>$${scenario.afterRetIncome.toLocaleString()}</td>
-          <td>$${scenario.desiredIncome.toLocaleString()}</td>
-          <td>${scenario.runOutOfMoneyAge}</td>
-          <td>$${scenario.totalNeeded.toLocaleString()}</td>
-          <td><button class="delete-btn" data-id="${scenario.id}">🗑</button></td>
+          <p><strong>Plan Sustainability:</strong> ${
+            isSelfSustaining ? "Sustainable" : "Unsustainable"
+          }</p>
+          <p><strong>Run Out of Money Age:</strong> ${
+            runOutOfMoneyAge || "Never"
+          }</p>
+          <p><strong>Recommended Retirement Age:</strong> ${recommendedAge}</p>
+          <p><strong>Total Amount Needed for Retirement:</strong> $${totalAmountNeeded.toLocaleString()}</p>
+          <p><strong>After Retirement Income:</strong> $${inputs.afterRetIncome.toLocaleString()}</p>
       `;
-      table.appendChild(row);
-  });
-
-  // Add delete event listeners
-  document.querySelectorAll(".delete-btn").forEach(button => {
-      button.addEventListener("click", deleteScenario);
-  });
-}
-
-// Function to delete a scenario
-function deleteScenario(event) {
-    const id = parseInt(event.target.getAttribute("data-id"));
-    savedScenarios = savedScenarios.filter(scenario => scenario.id !== id);
-    updateScenarioTable();
-}
-
-// Event listener for "Save Scenario" button
-document.getElementById("save-scenario").addEventListener("click", saveScenario);
+  }
 
 function renderCharts(data) {
   const ages = data.map((row) => row.age);
@@ -643,21 +491,21 @@ function renderCharts(data) {
   });
 }
 
-function addDownloadButton(totalAmountNeeded) {
+function addDownloadButton() {
   console.log("Adding download button after successful calculation");
 
-  const pdfContainer = document.getElementById("pdf-download-container");
+  const pdfContainer = document.getElementById("download-container");
   if (pdfContainer) {
-      pdfContainer.innerHTML = ""; // Clear any existing button
-      const downloadButton = document.createElement("button");
-      downloadButton.textContent = "Download PDF";
-      downloadButton.id = "download-pdf-button";
-      downloadButton.onclick = () => {
-          downloadPDF(totalAmountNeeded); // Pass totalAmountNeeded to the function
-      };
-      pdfContainer.appendChild(downloadButton);
+    pdfContainer.innerHTML = ""; // Clear any existing button
+    const downloadButton = document.createElement("button");
+    downloadButton.textContent = "Download PDF";
+    downloadButton.id = "download-pdf-button";
+    downloadButton.onclick = () => {
+      showFormPopup();
+    };
+    pdfContainer.appendChild(downloadButton);
   } else {
-      console.error("Download container not found");
+    console.error("Download container 'download-container' not found");
   }
 }
 
@@ -720,250 +568,146 @@ function showFormPopup() {
   }, 5000);
 }
 
-async function downloadPDF(totalAmountNeeded) {
+function downloadPDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
 
-  console.log("Starting PDF generation...");
+  // Adding Title to the PDF
+  doc.setFontSize(14);
+  doc.text("Retirement Calculation Results", 10, 10);
 
-  // Check if autoTable is available
-  if (typeof doc.autoTable !== "function") {
-    console.error("jspdf-autotable plugin is missing!");
-    alert("Error: The PDF export is missing the required table plugin. Please check the script includes.");
-    return;
-  }
+  // Adding Summary of Inputs as a Table
+  doc.setFontSize(10);
+  doc.text("Summary of Inputs:", 10, 20);
+  doc.setFontSize(8);
 
-  // Brand Colors
-  const brandColors = {
-      primary: "#0E1F47",  // Dark Navy
-      secondary: "#B8864B", // Brown-Gold
-      highlight: "#D6AE5C", // Gold
-      light: "#E6E0D5",     // Beige
-      white: "#FFFFFF"
-  };
+  const inputs = getInputs();
+  const summaryTable = [
+    ["Desired Income", `$${inputs.desiredIncome.toLocaleString()}`],
+    ["Pre-Retirement Return", `${(inputs.preRetReturn * 100).toFixed(2)}%`],
+    ["Post-Retirement Return", `${(inputs.postRetReturn * 100).toFixed(2)}%`],
+    ["Current Age", `${inputs.currentAge}`],
+    ["Retirement Age", `${inputs.retirementAge}`],
+    ["Current Balance", `$${inputs.currentBalance.toLocaleString()}`],
+    ["Wage Inflation", `${(inputs.wageInflation * 100).toFixed(2)}%`],
+    ["Cost of Living Inflation", `${(inputs.costInflation * 100).toFixed(2)}%`],
+    ["Current Income", `$${inputs.currentIncome.toLocaleString()}`],
+    ["Annual Savings Rate", `${(inputs.annualSavingsRate * 100).toFixed(2)}%`],
+    ["Life Expectancy", `${inputs.lifeExpectancy}`],
+  ];
 
-  // Updated Logo URL
-  const logoUrl = "https://storage.googleapis.com/msgsndr/9wih8cCeGbwoNA2Aw7sS/media/65160598bfbfe07049a3bdfb.png";
-
-  try {
-      // Convert Logo URL to Base64
-      const logoBase64 = await getBase64FromUrl(logoUrl);
-
-      // Add Logo (Centered)
-      doc.addImage(logoBase64, "PNG", 60, 10, 90, 20);
-
-      // Add Title
-      doc.setFontSize(18);
-      doc.setTextColor(brandColors.primary);
-      doc.text("Retirement Calculation Report", 60, 40);
-
-      // Draw Separator Line
-      doc.setDrawColor(brandColors.secondary);
-      doc.line(10, 45, 200, 45);
-
-      // Summary Section
-      doc.setFontSize(12);
-      doc.setTextColor(brandColors.primary);
-      doc.text("Summary of Inputs:", 10, 55);
-
-      doc.setFontSize(10);
-      const inputs = getInputs();
-      const summaryTable = [
-          ["Desired Income", `$${inputs.desiredIncome.toLocaleString()}`],
-          ["After Retirement Income", `$${inputs.afterRetIncome.toLocaleString()}`],
-          ["Pre-Retirement Return", `${(inputs.preRetReturn * 100).toFixed(2)}%`],
-          ["Post-Retirement Return", `${(inputs.postRetReturn * 100).toFixed(2)}%`],
-          ["Current Age", `${inputs.currentAge}`],
-          ["Retirement Age", `${inputs.retirementAge}`],
-          ["Current Balance", `$${inputs.currentBalance.toLocaleString()}`],
-          ["Wage Inflation", `${(inputs.wageInflation * 100).toFixed(2)}%`],
-          ["Cost of Living Inflation", `${(inputs.costInflation * 100).toFixed(2)}%`],
-          ["Annual Savings Rate", `${(inputs.annualSavingsRate * 100).toFixed(2)}%`],
-          ["Life Expectancy", `${inputs.lifeExpectancy}`],
-      ];
-
-      console.log("Summary Table Added to PDF.");
-
-      doc.autoTable({
-          startY: 60,
-          head: [["Category", "Value"]],
-          body: summaryTable,
-          theme: "grid",
-          headStyles: {
-              fillColor: brandColors.secondary,
-              textColor: brandColors.white,
-          },
-          bodyStyles: {
-              textColor: brandColors.primary,
-          },
-          alternateRowStyles: {
-              fillColor: brandColors.light,
-          },
-          styles: {
-              fontSize: 9,
-          },
-          margin: { left: 10, right: 10 },
-      });
-
-
-
-      let currentY = doc.previousAutoTable.finalY + 10;
-
-      // Add Progress Bar
-      let progress = (inputs.currentBalance / totalAmountNeeded) * 100;
-      progress = Math.min(progress, 100); // Cap at 100%
-
-      console.log(`Progress Calculation: ${progress.toFixed(2)}%`); // Debugging log
-
-      // Draw Background Bar
-      doc.setFillColor(brandColors.light);
-      doc.rect(10, currentY, 190, 10, "F"); 
-
-      // Determine the Fill Color (Same as Website)
-      let progressColor = "#2ecc71"; // Default Green
-      if (progress < 50) {
-          progressColor = "#e74c3c"; // Red for low progress
-      } else if (progress < 80) {
-          progressColor = "#f39c12"; // Orange for mid progress
-      }
-
-      // Draw Filled Progress Bar
-      doc.setFillColor(progressColor);
-      doc.rect(10, currentY, (190 * progress) / 100, 10, "F");
-
-      // Add Progress Percentage Text in the Center
-      doc.setTextColor(brandColors.primary);
-      doc.setFontSize(10);
-      doc.text(`You have saved ${progress.toFixed(2)}% of your retirement goal.`, 60, currentY + 7);
-
-      currentY += 20; // Move down after progress bar
-
-      // Add Charts to the Same Page
-      doc.addPage();
-      doc.setFontSize(12);
-      doc.text("Retirement Fund Charts", 10, 20);
-
-      // Get Chart Images
-      const balanceChartCanvas = document.getElementById("balanceChart");
-      const incomeWithdrawalChartCanvas = document.getElementById("incomeWithdrawalChart");
-
-      if (balanceChartCanvas && incomeWithdrawalChartCanvas) {
-          const balanceChartImg = balanceChartCanvas.toDataURL("image/png");
-          const incomeWithdrawalChartImg = incomeWithdrawalChartCanvas.toDataURL("image/png");
-
-          // Reduce size to fit both charts on the same page
-          const chartWidth = 180; // Chart width in PDF
-          const chartHeight = 100; // Reduced height to fit both on one page
-
-          // Add Balance Chart
-          doc.addImage(balanceChartImg, "PNG", 10, 30, chartWidth, chartHeight);
-          
-          // Add Income vs. Withdrawal Chart below it
-          doc.addImage(incomeWithdrawalChartImg, "PNG", 10, 95, chartWidth, chartHeight);
-      }
-
-      console.log("Amortization Table Found.");
-
-      // Ensure amortization table starts on a new page
-      doc.addPage();
-      doc.setFontSize(12);
-      doc.setTextColor(brandColors.primary);
-      doc.text("Retirement Fund Projection", 10, 20);
-
-      const scheduleTable = document.getElementById("amortization-schedule");
-      if (scheduleTable) {
-          const rows = scheduleTable.getElementsByTagName("tr");
-
-          let tableData = [];
-          for (let i = 1; i < rows.length; i++) {
-              const cells = rows[i].getElementsByTagName("td");
-              if (cells.length > 0) {
-                  tableData.push([
-                      cells[0].innerText,
-                      cells[1].innerText,
-                      cells[2].innerText,
-                      cells[3].innerText,
-                      cells[4].innerText,
-                      cells[5].innerText,
-                      cells[6].innerText,
-                      cells[7].innerText,
-                  ]);
-              }
-          }
-
-          console.log("Extracted Data for Amortization Table:", tableData);
-
-          if (tableData.length > 0) {
-              doc.autoTable({
-                  startY: 25,
-                  head: [
-                      ["Age", "Income", "Balance", "Earnings", "Savings", "Withdrawal", "Ending Balance", "Rate (%)"],
-                  ],
-                  body: tableData,
-                  theme: "grid",
-                  headStyles: {
-                      fillColor: brandColors.secondary,
-                      textColor: brandColors.white,
-                  },
-                  bodyStyles: {
-                      textColor: brandColors.primary,
-                  },
-                  alternateRowStyles: {
-                      fillColor: brandColors.light,
-                  },
-                  styles: {
-                      fontSize: 8,
-                  },
-                  margin: { left: 10, right: 10 },
-              });
-          } else {
-              doc.text("No amortization data available.", 10, 30);
-          }
-      }
-
-
-      // Footer
-      doc.setFontSize(10);
-      doc.setTextColor(brandColors.secondary);
-      doc.text("Rise Capital Investments - Smart Retirement Planning", 60, 290);
-      doc.line(10, 285, 200, 285);
-
-      // Save the PDF
-      console.log("Saving PDF...");
-
-      doc.save("retirement_calculation_results.pdf");
-
-      console.log("PDF Saved Successfully.");
-
-  } catch (error) {
-      console.error("Error loading logo or charts:", error);
-  }
-}
-
-// Helper function to fetch and convert logo URL to Base64
-async function getBase64FromUrl(url) {
-  const response = await fetch(url);
-  const blob = await response.blob();
-  return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
-      reader.readAsDataURL(blob);
+  let startY = 25;
+  summaryTable.forEach(([key, value]) => {
+    doc.text(key, 10, startY);
+    doc.text(value, 90, startY);
+    doc.setDrawColor(200);
+    doc.line(10, startY - 3, 200, startY - 3); // Top line
+    doc.line(10, startY + 3, 200, startY + 3); // Bottom line
+    doc.line(10, startY - 3, 10, startY + 3); // Left line
+    doc.line(200, startY - 3, 200, startY + 3); // Right line
+    startY += 6;
   });
+
+  // Adding Charts to the PDF
+  const balanceChartCanvas = document.getElementById("balanceChart");
+  const incomeWithdrawalChartCanvas = document.getElementById(
+    "incomeWithdrawalChart"
+  );
+
+  if (balanceChartCanvas && incomeWithdrawalChartCanvas) {
+    const balanceChartImg = balanceChartCanvas.toDataURL("image/png");
+    const incomeWithdrawalChartImg =
+      incomeWithdrawalChartCanvas.toDataURL("image/png");
+
+    // Add Balance Chart to PDF
+    doc.addImage(balanceChartImg, "PNG", 10, startY + 10, 180, 70);
+    // Add Income vs Withdrawal Chart to PDF
+    doc.addImage(incomeWithdrawalChartImg, "PNG", 10, startY + 90, 180, 70);
+  }
+
+  // Add a new page for the table
+  doc.addPage();
+
+  // Adding Table to the PDF
+  startY = 20;
+  const lineHeight = 6;
+  const scheduleTable = document.getElementById("amortization-schedule");
+  if (scheduleTable) {
+    const rows = scheduleTable.getElementsByTagName("tr");
+
+    // Set up table headers
+    doc.setFontSize(7);
+    doc.setTextColor(255, 255, 255);
+    doc.setFillColor(8, 32, 71);
+    doc.rect(10, startY - 5, 190, 7, "F");
+    doc.text("Age", 12, startY);
+    doc.text("Yearly Income", 22, startY);
+    doc.text("Beginning Balance", 42, startY);
+    doc.text("Earnings", 70, startY);
+    doc.text("Annual Savings", 95, startY);
+    doc.text("Annual Withdrawal", 120, startY);
+    doc.text("Ending Balance", 150, startY);
+    doc.text("Withdrawal Rate (%)", 175, startY);
+    startY += lineHeight;
+
+    // Add table content
+    doc.setTextColor(0, 0, 0);
+    for (let i = 1; i < rows.length; i++) {
+      const cells = rows[i].getElementsByTagName("td");
+      if (cells.length > 0) {
+        const rowClass = rows[i].className;
+        if (rowClass.includes("highlight-yellow")) {
+          doc.setFillColor(255, 235, 59);
+          doc.rect(10, startY - 5, 190, lineHeight, "F");
+        } else if (rowClass.includes("highlight-red")) {
+          doc.setFillColor(244, 67, 54);
+          doc.rect(10, startY - 5, 190, lineHeight, "F");
+        }
+
+        // Draw grid lines
+        doc.setDrawColor(200);
+        doc.line(10, startY - 5, 200, startY - 5);
+        doc.line(10, startY + 1, 200, startY + 1);
+        doc.line(10, startY - 5, 10, startY + 1);
+        doc.line(200, startY - 5, 200, startY + 1);
+
+        // Add cell text
+        doc.text(cells[0].innerText, 12, startY);
+        doc.text(
+          cells[1].innerText === "-" ? "0" : cells[1].innerText,
+          22,
+          startY
+        );
+        doc.text(
+          Math.max(0, parseFloat(cells[2].innerText)).toFixed(2),
+          42,
+          startY
+        );
+        doc.text(
+          Math.max(0, parseFloat(cells[3].innerText)).toFixed(2),
+          70,
+          startY
+        );
+        doc.text(cells[4].innerText, 95, startY);
+        doc.text(cells[5].innerText, 120, startY);
+        doc.text(cells[6].innerText, 150, startY);
+        doc.text(cells[7].innerText, 175, startY);
+
+        startY += lineHeight;
+
+        if (startY > 280) {
+          doc.addPage();
+          startY = 20;
+        }
+      }
+    }
+  }
+
+  // Save the PDF
+  doc.save("retirement_calculation_results.pdf");
 }
-
-
-
-
-
-
 
 // Initialize the calculator when the document is ready
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Document is fully loaded");
-  document.querySelectorAll(".info-icon").forEach(icon => {
-    icon.addEventListener("click", (event) => {
-        event.stopPropagation(); 
-        alert(icon.getAttribute("data-tooltip"));
-    });
-  });
 });
