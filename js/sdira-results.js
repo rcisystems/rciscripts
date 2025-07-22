@@ -18,7 +18,7 @@ async function generatePDF() {
 
   try {
     // Page 1: Summary and charts
-    const page1 = document.getElementById('pdf-page1');
+    const page1 = getRequiredEl('pdf-page1');
     const canvas1 = await html2canvas(page1, { scale: 0.5, width: pageWidth - 40 });
     const imgData1 = canvas1.toDataURL('image/png');
     const imgProps1 = doc.getImageProperties(imgData1);
@@ -29,7 +29,7 @@ async function generatePDF() {
     doc.addPage();
 
     // Page 2: Amortization table
-    const page2 = document.getElementById('pdf-page2');
+    const page2 = getRequiredEl('pdf-page2');
     const canvas2 = await html2canvas(page2, { scale: 0.5, width: pageWidth - 40 });
     const imgData2 = canvas2.toDataURL('image/png');
     const imgProps2 = doc.getImageProperties(imgData2);
