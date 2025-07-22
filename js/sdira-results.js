@@ -6,46 +6,28 @@ function getRequiredEl(id) {
   return el;
 }
 
-// PDF generation using html2canvas and jsPDF
-async function generatePDF() {
+// PDF generation using jsPDF html() method
+function generatePDF() {
+  // Temporarily hide the download button
   const downloadContainer = getRequiredEl('download-container');
   const prevDisplay = downloadContainer.style.display;
   downloadContainer.style.display = 'none';
-  
+
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF('p', 'pt', 'letter');
-  const pageWidth = doc.internal.pageSize.getWidth();
-  
-  try {
-    // Page 1: Summary and charts
-    const page1 = getRequiredEl('pdf-page1');
-    const canvas1 = await html2canvas(page1, { scale: 0.5, width: pageWidth - 40 });
-    // Compute dimensions to fit
-    const imgWidth1 = pageWidth - 40;
-    const imgHeight1 = (canvas1.height * imgWidth1) / canvas1.width;
-    // Add canvas directly
-    doc.addImage(canvas1, 'PNG', 20, 20, imgWidth1, imgHeight1);
-    
-    // Page break
-    doc.addPage();
-    
-    // Page 2: Amortization table
-    // Capture the actual table element to avoid empty wrapper
-    const tableEl = getRequiredEl('amortization-schedule');
-    const canvas2 = await html2canvas(tableEl, { scale: 0.5, width: pageWidth - 40 });
-    const imgWidth2 = pageWidth - 40;
-    const imgHeight2 = (canvas2.height * imgWidth2) / canvas2.width;
-    doc.addImage(canvas2, 'PNG', 20, 20, imgWidth2, imgHeight2);
-    
-    // Save PDF
-    doc.save('SDIRA_Results.pdf');
-  } catch (error) {
-    console.error('PDF generation failed:', error);
-    alert('Could not generate PDF: ' + error.message);
-  } finally {
-    // Restore the download button
-    downloadContainer.style.display = prevDisplay || '';
-  }
+  const doc = new jsPDF('p', 'pt', 'a4');
+  const containerEl = document.getElementById('results-container');
+  doc.html(containerEl, {
+    callback: function (pdf) {
+      pdf.save('SDIRA_Results.pdf');
+      // Restore the download button display
+      if (downloadContainer) {
+        downloadContainer.style.display = prevDisplay || '';
+      }
+    },
+    x: 20,
+    y: 20,
+    html2canvas: { scale: 0.6 }
+  });
 }
 
 // Utility to render or update a chart by ID
