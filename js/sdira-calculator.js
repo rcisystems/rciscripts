@@ -145,11 +145,11 @@ function calculateRetirement() {
     sessionStorage.setItem('inputParams', JSON.stringify(inputs));
 
     // Reveal the "View Results" button
-    const viewBtn = document.getElementById('view-results-btn');
+    const viewBtn = document.getElementsByClassName('view-results-btn');
     if (viewBtn) {
       viewBtn.style.display = 'inline-block';
       viewBtn.onclick = () => {
-        window.location.href = 'results.html';
+        window.location.href = 'https://retorocapitalinvestments.com/retirement-calculator-results';
       };
     }
     // Exit so summary and charts aren't rendered here
