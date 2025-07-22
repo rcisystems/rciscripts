@@ -1,3 +1,4 @@
+console.log('DEBUG: sdira-results.js loaded');
 // Utility to fetch required elements and fail early if missing
 function getRequiredEl(id) {
   const el = document.getElementById(id);
@@ -55,6 +56,7 @@ function renderOrUpdateChart(id, configFn) {
 document.addEventListener('DOMContentLoaded', () => {
   // Retrieve amortization data from sessionStorage
   const amortData = JSON.parse(sessionStorage.getItem('amortData') || '[]');
+  console.log('DEBUG: amortData from sessionStorage:', amortData);
 
   // Cache progress bar elements
   const fillEl = document.getElementById('progress-bar-fill');
@@ -62,6 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Render retirement savings progress bar
   const inputs = JSON.parse(sessionStorage.getItem('inputParams') || '{}');
+  console.log('DEBUG: inputs from sessionStorage:', inputs);
   if (inputs.currentBalance !== undefined && inputs.retirementAge !== undefined && amortData.length) {
     const targetRow = amortData.find(r => r.age === inputs.retirementAge);
     if (targetRow) {
@@ -91,6 +94,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const recEl    = document.getElementById('recommended-age');
     const totalEl  = document.getElementById('total-needed');
 
+    console.log('DEBUG: About to populate summary elements');
+    console.log('DEBUG: planEl, runOutEl, recEl, totalEl:', planEl, runOutEl, recEl, totalEl);
+
     if (amortData.length && inputs.retirementAge !== undefined) {
     // Find target row at user’s desired retirement age
     const targetRow = amortData.find(r => r.age === inputs.retirementAge);
@@ -114,6 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Render amortization table
   const table = document.getElementById('amortization-schedule');
+  console.log('DEBUG: About to render table, table element:', table);
   if (table && amortData.length) {
     // compute row styling based on thresholds
     // (No longer used, replaced by CSS classes)
@@ -165,15 +172,18 @@ document.addEventListener('DOMContentLoaded', () => {
       html += renderRow(row);
     });
     table.innerHTML = html;
+    console.log('DEBUG: Amortization table HTML set');
   }
 
+  console.log('DEBUG: About to parse chartData');
   // Render charts using the existing renderCharts function
   if (typeof renderCharts === 'function') {
     renderCharts(amortData);
   }
 
-  // Render Income vs Withdrawal bar chart
   const chartData = JSON.parse(sessionStorage.getItem('chartData') || '{}');
+  console.log('DEBUG: chartData:', chartData);
+  console.log('DEBUG: Calling renderOrUpdateChart for incomeWithdrawalChart');
   renderOrUpdateChart('incomeWithdrawalChart', () => ({
     type: 'bar',
     data: {
@@ -218,9 +228,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Add Download PDF button
   const downloadContainer = getRequiredEl('download-container');
+  console.log('DEBUG: About to add Download PDF button');
+  console.log('DEBUG: downloadContainer:', downloadContainer);
   downloadContainer.innerHTML = ''; // clear any existing content
   const pdfButton = document.createElement('button');
   pdfButton.textContent = 'Download PDF';
   pdfButton.onclick = generatePDF;
   downloadContainer.appendChild(pdfButton);
+  console.log('DEBUG: Download button appended');
 });
