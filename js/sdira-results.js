@@ -53,7 +53,9 @@ function renderOrUpdateChart(id, configFn) {
   return new Chart(ctx, configFn());
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+// Initialize results page when ready
+function initResultsPage() {
+  console.log('DEBUG: initResultsPage running');
   // Retrieve amortization data from sessionStorage
   const amortData = JSON.parse(sessionStorage.getItem('amortData') || '[]');
   console.log('DEBUG: amortData from sessionStorage:', amortData);
@@ -73,12 +75,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const rawPercent = target > 0 ? (current / target) * 100 : 0;
       const clampedPercent = Math.min(Math.max(rawPercent, 0), 100);
 
-      // Update bar width
       if (fillEl) {
         fillEl.style.width = clampedPercent + '%';
       }
-
-      // Update text with fallback for surpassing goal
       if (textEl) {
         const message = rawPercent > 100
           ? `${Math.floor(rawPercent)}% funded (Surpassed goal!)`
@@ -89,58 +88,33 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==== Summary Section ====
-    const planEl = document.getElementById('plan-sustainability');
-    const runOutEl = document.getElementById('run-out-age');
-    const recEl    = document.getElementById('recommended-age');
-    const totalEl  = document.getElementById('total-needed');
-
-    console.log('DEBUG: About to populate summary elements');
-    console.log('DEBUG: planEl, runOutEl, recEl, totalEl:', planEl, runOutEl, recEl, totalEl);
-
-    if (amortData.length && inputs.retirementAge !== undefined) {
-    // Find target row at user’s desired retirement age
+  const planEl   = document.getElementById('plan-sustainability');
+  const runOutEl = document.getElementById('run-out-age');
+  const recEl    = document.getElementById('recommended-age');
+  const totalEl  = document.getElementById('total-needed');
+  console.log('DEBUG: About to populate summary elements', planEl, runOutEl, recEl, totalEl);
+  if (amortData.length && inputs.retirementAge !== undefined) {
     const targetRow = amortData.find(r => r.age === inputs.retirementAge);
     const totalNeeded = targetRow ? targetRow.endingBalance : 0;
-
-    // Sustainable if current balance ≥ that amount
-    const sustainable = inputs.currentBalance >= totalNeeded;
-    planEl.textContent = sustainable ? 'Sustainable' : 'Not sustainable';
-
-    // Run-out age: first age where endingBalance ≤ 0
-    const runOutRow = amortData.find(r => r.endingBalance <= 0);
+    planEl.textContent   = inputs.currentBalance >= totalNeeded ? 'Sustainable' : 'Not sustainable';
+    const runOutRow      = amortData.find(r => r.endingBalance <= 0);
     runOutEl.textContent = runOutRow ? runOutRow.age : 'Never';
-
-    // Recommended age using existing logic
-    const recommended = findRecommendedRetirementAge(inputs);
-    recEl.textContent = recommended;
-
-    // Total needed for retirement
-    totalEl.textContent = `$${totalNeeded.toLocaleString()}`;
-    }
+    recEl.textContent    = findRecommendedRetirementAge(inputs);
+    totalEl.textContent  = `$${totalNeeded.toLocaleString()}`;
+  }
 
   // Render amortization table
   const table = document.getElementById('amortization-schedule');
   console.log('DEBUG: About to render table, table element:', table);
   if (table && amortData.length) {
-    // compute row styling based on thresholds
-    // (No longer used, replaced by CSS classes)
-
-    // Describe why a row is highlighted (for accessibility)
     const getRowDescription = row => {
-      if (row.endingBalance < 0) {
-        return 'Ending balance falls below $0';
-      }
-      if (row.annualWithdrawal > row.earnings) {
-        return 'Withdrawal exceeds earnings';
-      }
+      if (row.endingBalance <= 0) return 'Ending balance falls below or equals $0';
+      if (row.annualWithdrawal > row.earnings) return 'Withdrawal exceeds earnings';
       return '';
     };
-
-    // Render a single table row
     const renderRow = row => {
       const desc = getRowDescription(row);
       const titleAttr = desc ? ` title="${desc}"` : '';
-      // Determine CSS class for row highlighting
       const cls = row.endingBalance <= 0
         ? 'highlight-red'
         : (row.annualWithdrawal > row.earnings ? 'highlight-yellow' : '');
@@ -155,8 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <td>$${row.endingBalance.toLocaleString()}</td>
         </tr>
       `;
-    };  
-
+    };
     let html = `
       <tr>
         <th>Age</th>
@@ -175,12 +148,8 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('DEBUG: Amortization table HTML set');
   }
 
+  // Render charts
   console.log('DEBUG: About to parse chartData');
-  // Render charts using the existing renderCharts function
-  if (typeof renderCharts === 'function') {
-    renderCharts(amortData);
-  }
-
   const chartData = JSON.parse(sessionStorage.getItem('chartData') || '{}');
   console.log('DEBUG: chartData:', chartData);
   console.log('DEBUG: Calling renderOrUpdateChart for incomeWithdrawalChart');
@@ -197,7 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
         {
           label: 'Annual Withdrawal ($)',
           data: chartData.balances.map((bal, i) =>
-            bal === 0 ? 0 : chartData.withdrawals[i]    
+            bal === 0 ? 0 : chartData.withdrawals[i]
           ),
           yAxisID: 'y1',
           backgroundColor: chartData.withdrawals.map((w, i) =>
@@ -230,10 +199,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const downloadContainer = getRequiredEl('download-container');
   console.log('DEBUG: About to add Download PDF button');
   console.log('DEBUG: downloadContainer:', downloadContainer);
-  downloadContainer.innerHTML = ''; // clear any existing content
+  downloadContainer.innerHTML = '';
   const pdfButton = document.createElement('button');
   pdfButton.textContent = 'Download PDF';
   pdfButton.onclick = generatePDF;
   downloadContainer.appendChild(pdfButton);
   console.log('DEBUG: Download button appended');
-});
+}
+
+// Hook init to DOM ready or run immediately
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initResultsPage);
+} else {
+  initResultsPage();
+}
