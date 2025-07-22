@@ -147,12 +147,14 @@ function calculateRetirement() {
     sessionStorage.setItem('inputParams', JSON.stringify(inputs));
 
     // AFTER you write to sessionStorage…
-    // Enable native GHL "View Results" button
+    // Enable native GHL "View Results" button and ensure visibility
     const viewBtn = document.querySelector('.view-results-btn');
     console.log('DEBUG: viewBtn selector returned:', viewBtn);
     if (viewBtn) {
-      viewBtn.disabled = false;
-      console.log('DEBUG: viewBtn.disabled is now', viewBtn.disabled);
+      // Ensure the GHL link is visible
+      viewBtn.style.display = 'inline-block';
+      viewBtn.classList.remove('none');
+      console.log('DEBUG: viewBtn is now visible with display:', viewBtn.style.display);
     }
     // Exit so summary and charts aren't rendered here
     // Populate summary on main page
