@@ -147,12 +147,10 @@ function calculateRetirement() {
     // AFTER you write to sessionStorage…
     // Enable native GHL "View Results" button
     const viewBtn = document.querySelector('.view-results-btn');
+    console.log('DEBUG: viewBtn selector returned:', viewBtn);
     if (viewBtn) {
       viewBtn.disabled = false;
-      // Use addEventListener so it augments existing behavior
-      viewBtn.addEventListener('click', () => {
-        window.location.href = 'results.html';
-      });
+      console.log('DEBUG: viewBtn.disabled is now', viewBtn.disabled);
     }
     // Exit so summary and charts aren't rendered here
     // Populate summary on main page
@@ -161,16 +159,20 @@ function calculateRetirement() {
       : findRecommendedRetirementAge(inputs);
     updateSummary(inputs, runOutOfMoneyAge, isSelfSustaining, recommendedAge, totalAmountNeeded);
 
+    console.log('DEBUG: summaryDiv lookup:', document.getElementById('summary'));
     const summaryDiv = document.getElementById('summary');
     if (summaryDiv) {
       summaryDiv.style.display = 'block';
     }
     // Show recalculate button if plan is unsustainable
+    console.log('DEBUG: Looking up recalcDiv:', document.getElementById('recalculate-button'));
+    console.log('DEBUG: isSelfSustaining:', isSelfSustaining, 'recommendedAge:', recommendedAge);
     const recalcDiv = document.getElementById('recalculate-button');
+    console.log('DEBUG: recalcDiv element:', recalcDiv);
     if (recalcDiv) {
-      recalcDiv.innerHTML = ''; 
+      recalcDiv.innerHTML = '';
       if (!isSelfSustaining) {
-        recalcDiv.style.display = 'block'; 
+        recalcDiv.style.display = 'block';
         recalcDiv.innerHTML = `<button onclick="recalculateWithRecommendedAge(${recommendedAge})">
           Recalculate with Recommended Retirement Age (${recommendedAge})
         </button>`;
