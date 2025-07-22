@@ -1,3 +1,5 @@
+// Debug: confirm script is loaded
+console.log('sdira-calculator.js loaded');
 // Load required libraries
 let useRecommendedAge = false; // Track whether the recommended age is being used
 
@@ -714,4 +716,12 @@ function downloadPDF() {
 // Initialize the calculator when the document is ready
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Document is fully loaded");
+  const calcBtn = document.getElementById('calculate-btn');
+  console.log('DEBUG: calculate button element:', calcBtn);
+  if (calcBtn) {
+    calcBtn.addEventListener('click', () => {
+      console.log('DEBUG: calculateRetirement call via click');
+      calculateRetirement();
+    });
+  }
 });
