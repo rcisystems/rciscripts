@@ -20,12 +20,11 @@ async function generatePDF() {
     // Page 1: Summary and charts
     const page1 = getRequiredEl('pdf-page1');
     const canvas1 = await html2canvas(page1, { scale: 0.5, width: pageWidth - 40 });
-    // Convert to JPEG base64 and strip prefix for jsPDF
-    const dataURL1 = canvas1.toDataURL('image/jpeg', 1.0);
-    const base64_1 = dataURL1.split(',')[1];
-    const imgProps1 = doc.getImageProperties(dataURL1);
-    const imgHeight1 = (imgProps1.height * (pageWidth - 40)) / imgProps1.width;
-    doc.addImage(base64_1, 'JPEG', 20, 20, pageWidth - 40, imgHeight1, undefined, 'FAST');
+    // Compute dimensions to fit
+    const imgWidth1 = pageWidth - 40;
+    const imgHeight1 = (canvas1.height * imgWidth1) / canvas1.width;
+    // Add canvas directly
+    doc.addImage(canvas1, 'PNG', 20, 20, imgWidth1, imgHeight1);
     
     // Page break
     doc.addPage();
@@ -33,12 +32,9 @@ async function generatePDF() {
     // Page 2: Amortization table
     const page2 = getRequiredEl('pdf-page2');
     const canvas2 = await html2canvas(page2, { scale: 0.5, width: pageWidth - 40 });
-    // Convert to JPEG base64 and strip prefix
-    const dataURL2 = canvas2.toDataURL('image/jpeg', 1.0);
-    const base64_2 = dataURL2.split(',')[1];
-    const imgProps2 = doc.getImageProperties(dataURL2);
-    const imgHeight2 = (imgProps2.height * (pageWidth - 40)) / imgProps2.width;
-    doc.addImage(base64_2, 'JPEG', 20, 20, pageWidth - 40, imgHeight2, undefined, 'FAST');
+    const imgWidth2 = pageWidth - 40;
+    const imgHeight2 = (canvas2.height * imgWidth2) / canvas2.width;
+    doc.addImage(canvas2, 'PNG', 20, 20, imgWidth2, imgHeight2);
     
     // Save PDF
     doc.save('SDIRA_Results.pdf');
