@@ -6,33 +6,44 @@ function getRequiredEl(id) {
   return el;
 }
 
-// PDF generation using jsPDF
+// PDF generation using html2canvas and jsPDF
 async function generatePDF() {
-  // Temporarily hide download button during PDF rendering
   const downloadContainer = getRequiredEl('download-container');
-  let prevDisplay = downloadContainer.style.display;
+  const prevDisplay = downloadContainer.style.display;
   downloadContainer.style.display = 'none';
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF('p', 'pt', 'letter');
+  const pageWidth = doc.internal.pageSize.getWidth();
+
   try {
-    // Page 1: summary and charts
+    // Page 1: Summary and charts
     const page1 = document.getElementById('pdf-page1');
-    await doc.html(page1, { x:20, y:20, html2canvas:{ scale:0.5, width:550 } });
+    const canvas1 = await html2canvas(page1, { scale: 0.5, width: pageWidth - 40 });
+    const imgData1 = canvas1.toDataURL('image/png');
+    const imgProps1 = doc.getImageProperties(imgData1);
+    const imgHeight1 = (imgProps1.height * (pageWidth - 40)) / imgProps1.width;
+    doc.addImage(imgData1, 'PNG', 20, 20, pageWidth - 40, imgHeight1);
+
+    // Page break
     doc.addPage();
-    // Page 2: amortization table
+
+    // Page 2: Amortization table
     const page2 = document.getElementById('pdf-page2');
-    await doc.html(page2, { x:20, y:20, html2canvas:{ scale:0.5, width:550 } });
-    // Save after both pages
+    const canvas2 = await html2canvas(page2, { scale: 0.5, width: pageWidth - 40 });
+    const imgData2 = canvas2.toDataURL('image/png');
+    const imgProps2 = doc.getImageProperties(imgData2);
+    const imgHeight2 = (imgProps2.height * (pageWidth - 40)) / imgProps2.width;
+    doc.addImage(imgData2, 'PNG', 20, 20, pageWidth - 40, imgHeight2);
+
+    // Save PDF
     doc.save('SDIRA_Results.pdf');
-    // Restore button
-    if (downloadContainer) downloadContainer.style.display = prevDisplay || '';
-  } catch(error) {
+  } catch (error) {
     console.error('PDF generation failed:', error);
     alert('Could not generate PDF: ' + error.message);
-    if (downloadContainer) {
-      downloadContainer.style.display = prevDisplay || '';
-    }
+  } finally {
+    // Restore the download button
+    downloadContainer.style.display = prevDisplay || '';
   }
 }
 
