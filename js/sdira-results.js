@@ -31,7 +31,9 @@ async function generatePDF() {
     
     // Page 2: Amortization table
     const page2 = getRequiredEl('pdf-page2');
-    const canvas2 = await html2canvas(page2, { scale: 0.5, width: pageWidth - 40 });
+    // Find the table container within page2 for canvas capture
+    const tableContainer = page2.querySelector('.table-container') || page2;
+    const canvas2 = await html2canvas(tableContainer, { scale: 0.5, width: pageWidth - 40 });
     const imgWidth2 = pageWidth - 40;
     const imgHeight2 = (canvas2.height * imgWidth2) / canvas2.width;
     doc.addImage(canvas2, 'PNG', 20, 20, imgWidth2, imgHeight2);
