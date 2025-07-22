@@ -144,13 +144,15 @@ function calculateRetirement() {
     }));
     sessionStorage.setItem('inputParams', JSON.stringify(inputs));
 
-    // Reveal the "View Results" button
-    const viewBtn = document.getElementsByClassName('view-results-btn');
+    // AFTER you write to sessionStorage…
+    // Enable native GHL "View Results" button
+    const viewBtn = document.querySelector('.view-results-btn');
     if (viewBtn) {
-      viewBtn.style.display = 'block';
-      // viewBtn.onclick = () => {
-      //   window.location.href = 'https://retorocapitalinvestments.com/retirement-calculator-results';
-      // };
+      viewBtn.disabled = false;
+      // Use addEventListener so it augments existing behavior
+      viewBtn.addEventListener('click', () => {
+        window.location.href = 'results.html';
+      });
     }
     // Exit so summary and charts aren't rendered here
     // Populate summary on main page
