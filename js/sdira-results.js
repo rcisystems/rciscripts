@@ -155,10 +155,13 @@ function initResultsPage() {
             bal === 0 ? 0 : chartData.withdrawals[i]
         ),
         yAxisID: 'y1',
-        backgroundColor: chartData.withdrawals.map((w, i) =>
-          w > chartData.incomes[i] ? '#f8e8a2f1' : undefined
-      ),
-    }
+        backgroundColor: Array.isArray(chartData.withdrawals) && Array.isArray(chartData.incomes)
+          ? chartData.withdrawals.map((w, i) =>
+              w > chartData.incomes[i] ? '#f8e8a2f1' : undefined
+            )
+          : []
+      }
+    ]
   ]
 },
 options: {
