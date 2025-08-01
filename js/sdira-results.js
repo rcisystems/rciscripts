@@ -139,6 +139,15 @@ function initResultsPage() {
   }));
   console.log('DEBUG: Balance Over Time chart rendered');
   console.log('DEBUG: Calling renderOrUpdateChart for incomeWithdrawalChart');
+  // Fallback UI if chart data is incomplete
+  if (!Array.isArray(chartData.ages) || !Array.isArray(chartData.balances) ||
+      !Array.isArray(chartData.incomes) || !Array.isArray(chartData.withdrawals)) {
+    const incomeChartContainer = document.getElementById('incomeWithdrawalChart')?.parentElement;
+    if (incomeChartContainer) {
+      incomeChartContainer.innerHTML = '<p style="color: red; font-weight: bold;">Chart data is incomplete or missing.</p>';
+    }
+    return;
+  }
   renderOrUpdateChart('incomeWithdrawalChart', () => ({
     type: 'bar',
     data: {
