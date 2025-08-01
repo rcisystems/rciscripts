@@ -14,7 +14,7 @@ function generatePDF() {
   downloadContainer.style.display = 'none';
 
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF('p', 'pt', 'a4');
+  const doc = new jsPDF('p', 'pt', 'letter');
   const containerEl = document.getElementById('results-container');
   doc.html(containerEl, {
     callback: function (pdf) {
