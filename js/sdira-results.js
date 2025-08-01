@@ -6,30 +6,6 @@ function getRequiredEl(id) {
   return el;
 }
 
-// PDF generation using jsPDF html() method
-function generatePDF() {
-  // Temporarily hide the download button
-  const downloadContainer = getRequiredEl('download-container');
-  const prevDisplay = downloadContainer.style.display;
-  downloadContainer.style.display = 'none';
-
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF('p', 'pt', 'letter');
-  const containerEl = document.getElementById('results-container');
-  doc.html(containerEl, {
-    callback: function (pdf) {
-      pdf.save('SDIRA_Results.pdf');
-      // Restore the download button display
-      if (downloadContainer) {
-        downloadContainer.style.display = prevDisplay || '';
-      }
-    },
-    x: 20,
-    y: 20,
-    html2canvas: { scale: 0.6 }
-  });
-}
-
 // Utility to render or update a chart by ID
 function renderOrUpdateChart(id, configFn) {
   const canvas = document.getElementById(id);
@@ -204,17 +180,6 @@ options: {
   }
 }
 }));
-
-// Add Download PDF button
-const downloadContainer = getRequiredEl('download-container');
-console.log('DEBUG: About to add Download PDF button');
-console.log('DEBUG: downloadContainer:', downloadContainer);
-downloadContainer.innerHTML = '';
-const pdfButton = document.createElement('button');
-pdfButton.textContent = 'Download PDF';
-pdfButton.onclick = generatePDF;
-downloadContainer.appendChild(pdfButton);
-console.log('DEBUG: Download button appended');
 }
 
 // Hook init to DOM ready or run immediately
