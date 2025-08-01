@@ -151,38 +151,39 @@ function initResultsPage() {
         },
         {
           label: 'Annual Withdrawal ($)',
-          data: chartData.balances.map((bal, i) =>
-            bal === 0 ? 0 : chartData.withdrawals[i]
-        ),
-        yAxisID: 'y1',
-        backgroundColor: Array.isArray(chartData.withdrawals) && Array.isArray(chartData.incomes)
-          ? chartData.withdrawals.map((w, i) =>
-              w > chartData.incomes[i] ? '#f8e8a2f1' : undefined
-            )
-          : []
-      }
-    ]
-  ]
-},
-options: {
-  scales: {
-    x: { title: { display: true, text: 'Age' } },
-    y: {
-      type: 'linear',
-      position: 'left',
-      title: { display: true, text: 'Amount ($)' },
-      beginAtZero: true
+          data: Array.isArray(chartData.balances) && Array.isArray(chartData.withdrawals)
+            ? chartData.balances.map((bal, i) =>
+                bal === 0 ? 0 : chartData.withdrawals[i]
+              )
+            : [],
+          yAxisID: 'y1',
+          backgroundColor: Array.isArray(chartData.withdrawals) && Array.isArray(chartData.incomes)
+            ? chartData.withdrawals.map((w, i) =>
+                w > chartData.incomes[i] ? '#f8e8a2f1' : undefined
+              )
+            : []
+        }
+      ]
     },
-    y1: {
-      type: 'linear',
-      position: 'right',
-      grid: { drawOnChartArea: false },
-      title: { display: true, text: 'Amount ($)' },
-      beginAtZero: true
+    options: {
+      scales: {
+        x: { title: { display: true, text: 'Age' } },
+        y: {
+          type: 'linear',
+          position: 'left',
+          title: { display: true, text: 'Amount ($)' },
+          beginAtZero: true
+        },
+        y1: {
+          type: 'linear',
+          position: 'right',
+          grid: { drawOnChartArea: false },
+          title: { display: true, text: 'Amount ($)' },
+          beginAtZero: true
+        }
+      }
     }
-  }
-}
-}));
+  }));
 }
 
 // Hook init to DOM ready or run immediately
