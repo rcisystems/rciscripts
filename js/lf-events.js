@@ -1,3 +1,5 @@
+console.log("LF-EVENTS JS LOADED");
+
 /************************************************************
  * LAKE FORK EVENTS — FRONTEND JS (FULLY PATCHED, 2025)
  * Matches 13-column backend + Leaflet map + event rendering
@@ -271,4 +273,5 @@ eventForm.addEventListener("submit", async (e) => {
 window.addEventListener("DOMContentLoaded", async () => {
   initMap();
   await loadEvents();
+  console.log("Calling loadEvents()");
 });
