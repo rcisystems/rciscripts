@@ -1,4 +1,6 @@
 console.log("LF-EVENTS JS LOADED");
+console.log("Before DOMContentLoaded hook");
+
 
 /************************************************************
  * LAKE FORK EVENTS — FRONTEND JS (FULLY PATCHED, 2025)
@@ -271,7 +273,8 @@ eventForm.addEventListener("submit", async (e) => {
  * INIT APP
  ************************************************************/
 window.addEventListener("DOMContentLoaded", async () => {
+  console.log("DOMContentLoaded entered");
+  console.log("Calling loadEvents()");
   initMap();
   await loadEvents();
-  console.log("Calling loadEvents()");
 });
