@@ -1,19 +1,22 @@
-/*******************************************************
- * L A K E   F O R K   E V E N T S
- * Leaflet Version – Full Frontend JS
- * Matches existing HTML, backend, logging, POST, modal,
- * pagination, clustering, and geocoding.
- *******************************************************/
+/************************************************************
+ * LAKE FORK EVENTS — FRONTEND JS (FULLY PATCHED, 2025)
+ * Matches 13-column backend + Leaflet map + event rendering
+ *
+ * Backend event object (matching new schema):
+ * {
+ *   start, end, title, description, location,
+ *   regLink, logo, eventLink, status,
+ *   eventId, lat, lng, email
+ * }
+ ************************************************************/
 
-// ------------------------------
-// CONFIG
-// ------------------------------
+/*********************
+ * GLOBALS
+ *********************/
 const EVENTS_URL =
   "https://script.google.com/macros/s/AKfycbx303zczPC-AcXwbpoZg-NwWo3MoaWxbce_UgeLA_GTEP1sS1B-3HycIZ3re0arA3Yy/exec";
 
-// Map + Event data
 let map;
-let markersLayer;
 let clusterGroup;
 let allEvents = [];
 let currentPage = 1;
@@ -22,10 +25,10 @@ const EVENTS_PER_PAGE = 5;
 // DOM elements
 const eventsListEl = document.getElementById("events-list");
 const paginationEl = document.getElementById("pagination");
-const mapSpinner = document.getElementById("map-spinner");
 const spinner = document.getElementById("spinner");
+const mapSpinner = document.getElementById("map-spinner");
 
-// Modal elements
+// Modal + Form
 const eventFormModal = document.getElementById("eventFormModal");
 const openEventFormBtn = document.getElementById("openEventFormBtn");
 const closeEventFormBtn = document.getElementById("closeEventFormBtn");
@@ -39,99 +42,88 @@ const evLocation = document.getElementById("evLocation");
 const evDesc = document.getElementById("evDesc");
 const evRegLink = document.getElementById("evRegLink");
 const evLogo = document.getElementById("evLogo");
+const evEventLink = document.getElementById("evEventLink");
 const evEmail = document.getElementById("evEmail");
 const evHoney = document.getElementById("evHoney");
 const submitEventBtn = document.getElementById("submitEventBtn");
 
 
-// ------------------------------
-// INITIALIZE MAP (Leaflet)
-// ------------------------------
+/************************************************************
+ * MAP INITIALIZATION
+ ************************************************************/
 function initMap() {
-  console.log("[LF EVENTS] Initializing Leaflet map…");
+  try {
+    map = L.map("eventsMap").setView([32.764, -96.802], 6);
 
-  map = L.map("eventsMap").setView([32.764, -96.802], 6);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "© OpenStreetMap"
+    }).addTo(map);
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 18,
-    attribution: "© OpenStreetMap"
-  }).addTo(eventsMap);
-
-  clusterGroup = L.markerClusterGroup();
-  map.addLayer(clusterGroup);
+    clusterGroup = L.markerClusterGroup();
+    map.addLayer(clusterGroup);
+  } catch (err) {
+    console.error("MAP INIT ERROR:", err);
+  }
 }
 
 
-// ------------------------------
-// LOAD EVENTS FROM BACKEND
-// ------------------------------
+/************************************************************
+ * LOAD EVENTS (GET)
+ ************************************************************/
 async function loadEvents() {
-  console.log("[LF EVENTS] Fetching events…");
   spinner.style.display = "block";
 
-  let response;
   try {
-    response = await fetch(EVENTS_URL);
+    const resp = await fetch(EVENTS_URL);
+    const data = await resp.json();
+
+    if (!Array.isArray(data)) {
+      console.error("Invalid GET response:", data);
+      spinner.style.display = "none";
+      return;
+    }
+
+    allEvents = data;
+    renderEvents();
+    addMarkers();
+
   } catch (err) {
-    console.error("[LF EVENTS] Network error:", err);
-    showFatalError("Network error contacting server.");
-    return;
+    console.error("GET request error:", err);
   }
-
-  console.log("[LF EVENTS] Raw response:", response);
-
-  let data;
-  try {
-    data = await response.json();
-  } catch (err) {
-    console.error("[LF EVENTS] Invalid JSON:", err);
-    showFatalError("Invalid server JSON.");
-    return;
-  }
-
-  console.log("[LF EVENTS] Parsed response:", data);
-
-  if (!Array.isArray(data)) {
-    console.error("[LF EVENTS] Backend returned non-array:", data);
-    showFatalError("Server returned an unexpected format.");
-    return;
-  }
-
-  allEvents = data;
-  console.log("[LF EVENTS] Total published events:", allEvents.length);
-
-  renderEvents();
-  addMarkers();
 
   spinner.style.display = "none";
 }
 
 
-// ------------------------------
-// RENDER EVENTS (LIST + PAGINATION)
-// ------------------------------
+/************************************************************
+ * RENDER EVENT LIST + PAGINATION
+ ************************************************************/
 function renderEvents() {
+  eventsListEl.classList.remove("hidden");
   eventsListEl.innerHTML = "";
 
-  const startIndex = (currentPage - 1) * EVENTS_PER_PAGE;
-  const pageEvents = allEvents.slice(startIndex, startIndex + EVENTS_PER_PAGE);
-
-  if (pageEvents.length === 0) {
-    eventsListEl.innerHTML = "<p>No events found.</p>";
+  if (allEvents.length === 0) {
+    eventsListEl.innerHTML = `<p>No events found.</p>`;
+    paginationEl.innerHTML = "";
     return;
   }
 
+  const startIdx = (currentPage - 1) * EVENTS_PER_PAGE;
+  const pageEvents = allEvents.slice(startIdx, startIdx + EVENTS_PER_PAGE);
+
   pageEvents.forEach(ev => {
-    const item = document.createElement("div");
-    item.className = "event-item";
-    item.innerHTML = `
+    const div = document.createElement("div");
+    div.className = "event-item";
+    div.innerHTML = `
       <h3>${ev.title}</h3>
       <p><strong>Date:</strong> ${ev.start}</p>
       <p><strong>Location:</strong> ${ev.location}</p>
-      <p>${ev.description}</p>
+      <p>${ev.description || ""}</p>
       ${ev.regLink ? `<a href="${ev.regLink}" target="_blank">Register</a>` : ""}
+      ${ev.eventLink ? `<br><a href="${ev.eventLink}" target="_blank">Event Link</a>` : ""}
     `;
-    eventsListEl.appendChild(item);
+    eventsListEl.appendChild(div);
   });
 
   renderPagination();
@@ -139,14 +131,13 @@ function renderEvents() {
 
 function renderPagination() {
   paginationEl.innerHTML = "";
-
   const totalPages = Math.ceil(allEvents.length / EVENTS_PER_PAGE);
   if (totalPages <= 1) return;
 
   for (let p = 1; p <= totalPages; p++) {
     const btn = document.createElement("button");
     btn.textContent = p;
-    btn.className = p === currentPage ? "active" : "";
+    if (p === currentPage) btn.classList.add("active");
     btn.addEventListener("click", () => {
       currentPage = p;
       renderEvents();
@@ -156,37 +147,37 @@ function renderPagination() {
 }
 
 
-// ------------------------------
-// ADD MARKERS TO MAP (Leaflet)
-// ------------------------------
+/************************************************************
+ * ADD MARKERS TO MAP
+ ************************************************************/
 function addMarkers() {
-  console.log("[LF EVENTS] Adding markers to map…");
-  mapSpinner.style.display = "block";
+  mapSpinner.classList.remove("hidden");
   clusterGroup.clearLayers();
 
   allEvents.forEach(ev => {
-    if (!ev.lat || !ev.lng) return;
+    // lat/lng must match backend schema exactly
+    if (ev.lat == null || ev.lng == null) return;
 
     const marker = L.marker([ev.lat, ev.lng]);
-
     const popupHTML = `
       <strong>${ev.title}</strong><br>
       ${ev.location}<br>
       ${ev.start}<br><br>
-      ${ev.regLink ? `<a href="${ev.regLink}" target="_blank">Register</a>` : ""}
+      ${ev.regLink ? `<a href="${ev.regLink}" target="_blank">Register</a><br>` : ""}
+      ${ev.eventLink ? `<a href="${ev.eventLink}" target="_blank">Event Page</a>` : ""}
     `;
 
     marker.bindPopup(popupHTML);
     clusterGroup.addLayer(marker);
   });
 
-  mapSpinner.style.display = "none";
+  mapSpinner.classList.add("hidden");
 }
 
 
-// ------------------------------
-// FORM MODAL HANDLERS
-// ------------------------------
+/************************************************************
+ * MODAL FORM HANDLERS
+ ************************************************************/
 openEventFormBtn.addEventListener("click", () => {
   eventFormModal.classList.remove("hidden");
 });
@@ -202,41 +193,35 @@ window.addEventListener("click", e => {
 });
 
 
-// ------------------------------
-// FORM SUBMISSION (POST → Apps Script)
-// ------------------------------
-eventForm.addEventListener("submit", async e => {
+/************************************************************
+ * POST — SUBMIT NEW EVENT
+ ************************************************************/
+eventForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  console.log("[LF EVENTS] Submitting event…");
-
-  // Honeypot detection
   if (evHoney.value.trim() !== "") {
     alert("Spam detected.");
     return;
   }
 
-  // Validate fields
-  if (!evTitle.value.trim()) {
-    alert("Title is required.");
-    return;
-  }
-  if (!evStart.value || !evEnd.value) {
-    alert("Start and end date are required.");
+  if (!evTitle.value.trim() || !evStart.value || !evEnd.value) {
+    alert("Please fill out Title, Start, and End date.");
     return;
   }
 
   submitEventBtn.disabled = true;
-  submitEventBtn.innerText = "Submitting…";
+  submitEventBtn.textContent = "Submitting…";
 
   let token;
   try {
-    token = await grecaptcha.execute("6Lf8aggsAAAAAIOpVuFxlM1gyC2AGQWegPZ8RLOz", { action: "submit" });
+    token = await grecaptcha.execute("6Lf8aggsAAAAAIOpVuFxlM1gyC2AGQWegPZ8RLOz", {
+      action: "submit"
+    });
   } catch (err) {
-    console.error("[LF EVENTS] reCAPTCHA error:", err);
-    alert("reCAPTCHA failed.");
+    console.error("reCAPTCHA error:", err);
+    alert("reCAPTCHA failed. Reload the page and try again.");
     submitEventBtn.disabled = false;
-    submitEventBtn.innerText = "Submit Event";
+    submitEventBtn.textContent = "Submit Event";
     return;
   }
 
@@ -244,57 +229,46 @@ eventForm.addEventListener("submit", async e => {
     title: evTitle.value.trim(),
     start: evStart.value,
     end: evEnd.value,
-    description: evDesc.value.trim(),
     location: evLocation.value.trim(),
+    description: evDesc.value.trim(),
     regLink: evRegLink.value.trim(),
     logo: evLogo.value.trim(),
+    eventLink: evEventLink.value.trim(),
     email: evEmail.value.trim(),
     honeypot: evHoney.value,
     recaptchaToken: token
   };
 
-  console.log("[LF EVENTS] Payload:", payload);
-
   try {
-    const response = await fetch(EVENTS_URL, {
+    const resp = await fetch(EVENTS_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
 
-    const result = await response.json();
-    console.log("[LF EVENTS] POST result:", result);
-
+    const result = await resp.json();
     if (result.success) {
       alert("Event submitted for approval!");
-      eventFormModal.classList.add("hidden");
       eventForm.reset();
+      eventFormModal.classList.add("hidden");
     } else {
-      alert("Failed: " + (result.reason || result.error));
+      alert("Submission failed: " + result.reason);
     }
+
   } catch (err) {
-    console.error("[LF EVENTS] POST error:", err);
-    alert("Submission failed.");
+    console.error("POST error:", err);
+    alert("Submission failed due to a network error.");
   }
 
   submitEventBtn.disabled = false;
-  submitEventBtn.innerText = "Submit Event";
+  submitEventBtn.textContent = "Submit Event";
 });
 
 
-// ------------------------------
-// ERROR FALLBACK
-// ------------------------------
-function showFatalError(msg) {
-  eventsListEl.innerHTML = `<p style="color:red;font-weight:bold;">${msg}</p>`;
-}
-
-
-// ------------------------------
-// START APP
-// ------------------------------
+/************************************************************
+ * INIT APP
+ ************************************************************/
 window.addEventListener("DOMContentLoaded", async () => {
-  console.log("[LF EVENTS] App starting…");
   initMap();
   await loadEvents();
 });
