@@ -273,9 +273,14 @@ eventForm.addEventListener("submit", async (e) => {
 /************************************************************
  * INIT APP
  ************************************************************/
+console.log("Registering DOMContentLoaded handler...");
+
 window.addEventListener("DOMContentLoaded", async () => {
   console.log("DOMContentLoaded entered");
   console.log("Calling loadEvents()");
   initMap();
   await loadEvents();
 });
+
+console.log("DOMContentLoaded handler registered successfully");
+
