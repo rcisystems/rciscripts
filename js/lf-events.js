@@ -1,8 +1,13 @@
-console.log("LF-EVENTS JS LOADED");
+/******************************************************************
+ * LF-EVENTS.JS — Hydration-Safe, Debounced, Animated, Leaflet Map
+ ******************************************************************/
 
-// =============================
+console.log("LF-EVENTS JS LOADED");
+console.log("Before DOMContentLoaded hook");
+
+// =========================
 // Debounce Utility
-// =============================
+// =========================
 function debounce(fn, delay = 250) {
   let timeout;
   return function (...args) {
@@ -11,233 +16,229 @@ function debounce(fn, delay = 250) {
   };
 }
 
+// =========================
+// DOM REFERENCES
+// =========================
+let map;
+let markerCluster;
 
-// =============================
-// CONFIG
-// =============================
-const BACKEND_URL =
-  "https://script.google.com/macros/s/AKfycbx303zczPC-AcXwbpoZg-NwWo3MoaWxbce_UgeLA_GTEP1sS1B-3HycIZ3re0arA3Yy/exec";
-
-let eventsData = [];
-let filtered = [];
-let map = null;
-let markerCluster = null;
-
-// =============================
-// DOM ELEMENTS
-// =============================
-const searchInput = document.getElementById("search");
+const searchInput = document.getElementById("searchInput");
 const locationFilter = document.getElementById("locationFilter");
 const dateFilter = document.getElementById("dateFilter");
-const timeToggle = document.getElementById("timeToggle");
-const showPast = document.getElementById("showPast");
+
 const eventsList = document.getElementById("events-list");
 const pagination = document.getElementById("pagination");
+
 const mapSpinner = document.getElementById("map-spinner");
+const spinner = document.getElementById("spinner");
 
-// =============================
-// MAP INITIALIZATION
-// =============================
+console.log("Is L defined at load?", typeof L !== "undefined" ? L : "NO");
+
+// =====================================================
+// SAFE HYDRATION DELAY: Prevent hydration mismatches
+// =====================================================
+document.addEventListener("DOMContentLoaded", () => {
+  console.log("Registering hydration-safe init…");
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      console.log("Hydration safe-frame reached — initializing map+events");
+      init();
+    });
+  });
+});
+
+function init() {
+  console.log("Init running…");
+  setupMap();
+  loadEvents();
+
+  // Debounced search
+  searchInput.addEventListener("input", debounce(applyFilters, 250));
+  locationFilter.addEventListener("change", debounce(applyFilters, 250));
+  dateFilter.addEventListener("change", debounce(applyFilters, 250));
+}
+
+// =====================================================
+// MAP SETUP
+// =====================================================
 function setupMap() {
-  console.log("Init map…");
+  console.log("Setting up leaflet map…");
 
-  map = L.map("eventsMap").setView([33.092, -95.484], 11);
+  map = L.map("map", { zoomControl: true }).setView([32.8, -96.8], 6);
 
-  const tileLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-  });
-
-  tileLayer.on("load", () => {
-    mapSpinner.classList.add("hidden");
-  });
+  const tileLayer = L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+    }
+  );
 
   tileLayer.addTo(map);
+
+  // Hide spinner when tiles done
+  tileLayer.on("load", () => {
+    console.log("Tiles loaded — hiding map spinner");
+    mapSpinner.classList.add("hidden");
+  });
 
   markerCluster = L.markerClusterGroup();
   map.addLayer(markerCluster);
 }
 
-// =============================
-// SKELETON LOADING
-// =============================
-function showSkeletons() {
-  eventsList.innerHTML = "";
-  for (let i = 0; i < 5; i++) {
-    const c = document.createElement("div");
-    c.className = "skeleton-card";
-    c.innerHTML = `
-      <div class="skeleton-line skeleton-long"></div>
-      <div class="skeleton-line skeleton-medium"></div>
-      <div class="skeleton-line skeleton-short"></div>
-    `;
-    eventsList.appendChild(c);
-  }
-  eventsList.classList.remove("hidden");
-}
-
-// =============================
-// LOAD EVENTS
-// =============================
+// =====================================================
+// LOAD EVENTS FROM APPS SCRIPT BACKEND
+// =====================================================
 async function loadEvents() {
-  showSkeletons();
-
   try {
-    const res = await fetch(BACKEND_URL);
-    const json = await res.json();
-    eventsData = json.events || [];
+    console.log("Loading events…");
+    spinner.classList.remove("hidden");
 
-    populateLocations();
+    const resp = await fetch(
+      "https://script.google.com/macros/s/AKfycbx303zczPC-AcXwbpoZg-NwWo3MoaWxbce_UgeLA_GTEP1sS1B-3HycIZ3re0arA3Yy/exec"
+    );
+
+    const data = await resp.json();
+
+    console.log("Events loaded:", data.events.length);
+
+    window.ALL_EVENTS = data.events;
+    renderSkeletons(10);
     applyFilters();
-    renderMarkers(filtered);
 
+    spinner.classList.add("hidden");
+
+    renderMarkers(data.events);
   } catch (err) {
     console.error("Error loading events:", err);
-    eventsList.innerHTML = "<p>Error loading events</p>";
   }
 }
 
-// =============================
+// =====================================================
+// SKELETON LOADING UI
+// =====================================================
+function renderSkeletons(count) {
+  eventsList.innerHTML = "";
+  for (let i = 0; i < count; i++) {
+    const skeleton = document.createElement("div");
+    skeleton.className = "skeleton-card";
+    skeleton.innerHTML = `
+      <div class="skeleton-title"></div>
+      <div class="skeleton-line"></div>
+      <div class="skeleton-line short"></div>
+    `;
+    eventsList.appendChild(skeleton);
+  }
+}
+
+// =====================================================
 // FILTER LOGIC
-// =============================
+// =====================================================
 function applyFilters() {
-  const text = searchInput.value.toLowerCase();
-  const loc = locationFilter.value.toLowerCase();
-  const d = dateFilter.value;
-  const showPastEvents = showPast.checked;
-  const mode = timeToggle.value;
-  const today = new Date();
+  if (!window.ALL_EVENTS) return;
 
-  filtered = eventsData.filter(ev => {
-    const titleMatch = ev.title.toLowerCase().includes(text);
-    const locationMatch = loc === "" || ev.location.toLowerCase().includes(loc);
+  const text = searchInput.value.toLowerCase().trim();
+  const location = locationFilter.value;
+  const date = dateFilter.value;
 
-    let dateMatch = true;
-    if (d) {
-      const evDate = new Date(ev.start).toISOString().split("T")[0];
-      dateMatch = evDate === d;
-    }
+  let filtered = window.ALL_EVENTS.filter(evt => {
+    const matchText =
+      evt.title.toLowerCase().includes(text) ||
+      evt.description.toLowerCase().includes(text);
 
-    const evDate = new Date(ev.start);
-    const isPast = evDate < today;
+    const matchLocation =
+      location === "all" || evt.location === location;
 
-    if (!showPastEvents) {
-      if (mode === "upcoming" && isPast) return false;
-      if (mode === "past" && !isPast) return false;
-    }
+    const matchDate = date === "all" || evt.startDate.startsWith(date);
 
-    return titleMatch && locationMatch && dateMatch;
+    return matchText && matchLocation && matchDate;
   });
 
   renderList(filtered, 1);
 }
 
-// =============================
-// POPULATE LOCATION DROPDOWN
-// =============================
-function populateLocations() {
-  const unique = [...new Set(eventsData.map(ev => ev.location))].sort();
-  locationFilter.innerHTML = `<option value="">All Locations</option>`;
-  unique.forEach(loc => {
-    locationFilter.innerHTML += `<option value="${loc}">${loc}</option>`;
-  });
-}
-
-// =============================
-// RENDER MARKERS
-// =============================
-function renderMarkers(events) {
-  markerCluster.clearLayers();
-
-  events.forEach(ev => {
-    if (!ev.lat || !ev.lng) return;
-
-    const marker = L.marker([ev.lat, ev.lng]);
-    marker.bindPopup(`
-      <b>${ev.title}</b><br>
-      ${ev.location}<br>
-      <small>${ev.start}</small>
-    `);
-    marker.on('add', () => {
-      const el = marker.getElement();
-      if (el) el.classList.add("drop");
-    });
-    markerCluster.addLayer(marker);
-      });
-}
-
-// =============================
-// RENDER LIST + PAGINATION
-// =============================
+// =====================================================
+// PAGINATED LIST RENDERING
+// =====================================================
 function renderList(events, page = 1) {
   const perPage = 10;
-  const pages = Math.ceil(events.length / perPage);
+  const totalPages = Math.ceil(events.length / perPage);
 
-  // Fade out skeletons
+  // Fade-out skeletons first
   const skeletons = eventsList.querySelectorAll(".skeleton-card");
   if (skeletons.length > 0) {
     skeletons.forEach((s, i) => {
-      s.style.animationDelay = `${i * 40}ms`; // Staggered (Option C)
+      s.style.animationDelay = `${i * 35}ms`;
       s.classList.add("fade-out");
     });
 
-    // Delay real rendering until fade-out finishes
     return setTimeout(() => {
       eventsList.innerHTML = "";
-      renderListCore(events, page); // extracted core renderer
-    }, 380); // matches fade length
+      renderListCore(events, page);
+    }, 380);
   }
 
-  // Normal render if no skeletons
   renderListCore(events, page);
-
-  pagination.innerHTML = "";
-
-  if (events.length === 0) {
-    eventsList.innerHTML = "<p>No events found.</p>";
-    return;
-  }
-
-  // Pagination buttons
-  for (let p = 1; p <= pages; p++) {
-    const btn = document.createElement("button");
-    btn.textContent = p;
-    btn.className = p === page ? "active" : "";
-    btn.onclick = () => renderList(events, p);
-    pagination.appendChild(btn);
-  }
-
-  // List items
-  const start = (page - 1) * perPage;
-  const slice = events.slice(start, start + perPage);
-
-  slice.forEach(ev => {
-    const div = document.createElement("div");
-    div.className = "event-item";
-    div.innerHTML = `
-      <h3>${ev.title}</h3>
-      <p>${ev.start}</p>
-      <p>${ev.location}</p>
-    `;
-    eventsList.appendChild(div);
-  });
 }
 
+function renderListCore(events, page) {
+  const perPage = 10;
+  const totalPages = Math.ceil(events.length / perPage);
 
+  eventsList.innerHTML = "";
+  pagination.innerHTML = "";
 
-// =============================
-// EVENT LISTENERS
-// =============================
-searchInput.addEventListener("input", debounce(applyFilters, 250));
-locationFilter.addEventListener("change", debounce(applyFilters, 250));
-dateFilter.addEventListener("change", debounce(applyFilters, 250));
-timeToggle.addEventListener("change", applyFilters);
-showPast.addEventListener("change", applyFilters);
+  const start = (page - 1) * perPage;
+  const pageEvents = events.slice(start, start + perPage);
 
-// =============================
-// INIT
-// =============================
-document.addEventListener("DOMContentLoaded", () => {
-  setupMap();
-  loadEvents();
-});
+  pageEvents.forEach(evt => {
+    const card = document.createElement("div");
+    card.className = "event-item";
+    card.innerHTML = `
+      <h3>${evt.title}</h3>
+      <p><strong>Date:</strong> ${evt.startDate}</p>
+      <p><strong>Location:</strong> ${evt.location}</p>
+      <p>${evt.description}</p>
+      <a href="${evt.eventLink}" target="_blank">View Event</a>
+    `;
+    eventsList.appendChild(card);
+  });
+
+  // Pagination
+  for (let i = 1; i <= totalPages; i++) {
+    const btn = document.createElement("button");
+    btn.textContent = i;
+    if (i === page) btn.classList.add("active");
+    btn.addEventListener("click", () => renderList(events, i));
+    pagination.appendChild(btn);
+  }
+}
+
+// =====================================================
+// MAP MARKER RENDERING
+// =====================================================
+function renderMarkers(events) {
+  markerCluster.clearLayers();
+
+  events.forEach(evt => {
+    if (!evt.latitude || !evt.longitude) return;
+
+    const marker = L.marker([evt.latitude, evt.longitude]);
+
+    marker.on("add", () => {
+      const el = marker.getElement();
+      if (el) el.classList.add("drop");
+    });
+
+    marker.bindPopup(`
+      <strong>${evt.title}</strong><br>
+      ${evt.startDate}<br>
+      ${evt.location}<br>
+      <a href="${evt.eventLink}" target="_blank">View Details</a>
+    `);
+
+    markerCluster.addLayer(marker);
+  });
+}
 
