@@ -26,36 +26,32 @@ let map, markerCluster;
 // =====================================================
 // SAFE HYDRATION DELAY
 // =====================================================
-document.addEventListener("DOMContentLoaded", () => {
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      console.log("Hydration completed — DOM ready.");
+window.addEventListener("load", () => {
+  console.log("Window load fired — React hydration finished.");
 
-      // ===== Assign DOM after hydration =====
-      searchInput = document.getElementById("searchInput");
-      locationFilter = document.getElementById("locationFilter");
-      dateFilter = document.getElementById("dateFilter");
+  // Now query DOM safely
+  searchInput = document.getElementById("searchInput");
+  locationFilter = document.getElementById("locationFilter");
+  dateFilter = document.getElementById("dateFilter");
 
-      eventsList = document.getElementById("events-list");
-      pagination = document.getElementById("pagination");
+  eventsList = document.getElementById("events-list");
+  pagination = document.getElementById("pagination");
+  mapSpinner = document.getElementById("map-spinner");
+  spinner = document.getElementById("spinner");
 
-      mapSpinner = document.getElementById("map-spinner");
-      spinner = document.getElementById("spinner");
-
-      console.log("DOM references assigned:", {
-        searchInput,
-        locationFilter,
-        dateFilter,
-        eventsList,
-        pagination,
-        mapSpinner,
-        spinner
-      });
-
-      init();
-    });
+  console.log("DOM references assigned:", {
+    searchInput,
+    locationFilter,
+    dateFilter,
+    eventsList,
+    pagination,
+    mapSpinner,
+    spinner
   });
+
+  init();
 });
+
 
 // =====================================================
 // INIT — runs after safe hydration
