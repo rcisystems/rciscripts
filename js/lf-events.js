@@ -265,19 +265,28 @@ document.addEventListener("DOMContentLoaded", () => {
         recaptchaToken: token
       };
 
-      const response = await fetch(
-        "https://script.google.com/macros/s/AKfycbx303zczPC-AcXwbpoZg-NwWo3MoaWxbce_UgeLA_GTEP1sS1B-3HycIZ3re0arA3Yy/exec",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        }
-      );
+      console.log("[LF EVENTS] Fetching events…");
 
-      const result = await response.json();
-      if (!result.success) {
-        return handleError(result.reason);
+      let response;
+      try {
+        response = await fetch("https://script.google.com/macros/s/AKfycbx303zczPC-AcXwbpoZg-NwWo3MoaWxbce_UgeLA_GTEP1sS1B-3HycIZ3re0arA3Yy/exec");
+      } catch (err) {
+        console.error("[LF EVENTS] Network error fetching events:", err);
+        return showFatalError("Network failure contacting event server.");
       }
+
+      console.log("[LF EVENTS] Raw response:", response);
+
+      let data;
+      try {
+        data = await response.json();
+      } catch (err) {
+        console.error("[LF EVENTS] Failed to parse JSON:", err);
+        return showFatalError("Server returned invalid JSON.");
+      }
+
+      console.log("[LF EVENTS] Parsed event data:", data);
+
 
       msg.innerHTML = `<p class="lf-success">Your event has been submitted and is pending approval.</p>`;
       form.reset();
@@ -315,3 +324,8 @@ document.addEventListener("DOMContentLoaded", () => {
     msg.innerHTML = `<p class="lf-error">${messages[reason] || "An error occurred. Please try again."}</p>`;
   }
 });
+
+function showFatalError(msg) {
+  const container = document.getElementById("events-list");
+  container.innerHTML = `<p style="color:red; font-weight:bold;">${msg}</p>`;
+}
