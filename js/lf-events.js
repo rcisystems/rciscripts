@@ -17,43 +17,56 @@ function debounce(fn, delay = 250) {
 }
 
 // =========================
-// DOM REFERENCES
+// DOM VARIABLES (assigned later)
 // =========================
-let map;
-let markerCluster;
-
-const searchInput = document.getElementById("searchInput");
-const locationFilter = document.getElementById("locationFilter");
-const dateFilter = document.getElementById("dateFilter");
-
-const eventsList = document.getElementById("events-list");
-const pagination = document.getElementById("pagination");
-
-const mapSpinner = document.getElementById("map-spinner");
-const spinner = document.getElementById("spinner");
-
-console.log("Is L defined at load?", typeof L !== "undefined" ? L : "NO");
+let searchInput, locationFilter, dateFilter;
+let eventsList, pagination, mapSpinner, spinner;
+let map, markerCluster;
 
 // =====================================================
-// SAFE HYDRATION DELAY: Prevent hydration mismatches
+// SAFE HYDRATION DELAY
 // =====================================================
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("Registering hydration-safe init…");
-
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      console.log("Hydration safe-frame reached — initializing map+events");
+      console.log("Hydration completed — DOM ready.");
+
+      // ===== Assign DOM after hydration =====
+      searchInput = document.getElementById("searchInput");
+      locationFilter = document.getElementById("locationFilter");
+      dateFilter = document.getElementById("dateFilter");
+
+      eventsList = document.getElementById("events-list");
+      pagination = document.getElementById("pagination");
+
+      mapSpinner = document.getElementById("map-spinner");
+      spinner = document.getElementById("spinner");
+
+      console.log("DOM references assigned:", {
+        searchInput,
+        locationFilter,
+        dateFilter,
+        eventsList,
+        pagination,
+        mapSpinner,
+        spinner
+      });
+
       init();
     });
   });
 });
 
+// =====================================================
+// INIT — runs after safe hydration
+// =====================================================
 function init() {
-  console.log("Init running…");
+  console.log("Init starting…");
+
   setupMap();
   loadEvents();
 
-  // Debounced search
+  // Debounced filters
   searchInput.addEventListener("input", debounce(applyFilters, 250));
   locationFilter.addEventListener("change", debounce(applyFilters, 250));
   dateFilter.addEventListener("change", debounce(applyFilters, 250));
@@ -63,7 +76,7 @@ function init() {
 // MAP SETUP
 // =====================================================
 function setupMap() {
-  console.log("Setting up leaflet map…");
+  console.log("Setting up Leaflet map…");
 
   map = L.map("map", { zoomControl: true }).setView([32.8, -96.8], 6);
 
@@ -77,9 +90,8 @@ function setupMap() {
 
   tileLayer.addTo(map);
 
-  // Hide spinner when tiles done
   tileLayer.on("load", () => {
-    console.log("Tiles loaded — hiding map spinner");
+    console.log("Tile layer loaded — hiding spinner");
     mapSpinner.classList.add("hidden");
   });
 
@@ -88,7 +100,7 @@ function setupMap() {
 }
 
 // =====================================================
-// LOAD EVENTS FROM APPS SCRIPT BACKEND
+// LOAD EVENTS FROM BACKEND
 // =====================================================
 async function loadEvents() {
   try {
@@ -100,10 +112,10 @@ async function loadEvents() {
     );
 
     const data = await resp.json();
-
-    console.log("Events loaded:", data.events.length);
+    console.log("Events fetched:", data.events.length);
 
     window.ALL_EVENTS = data.events;
+
     renderSkeletons(10);
     applyFilters();
 
@@ -133,7 +145,7 @@ function renderSkeletons(count) {
 }
 
 // =====================================================
-// FILTER LOGIC
+// FILTERS
 // =====================================================
 function applyFilters() {
   if (!window.ALL_EVENTS) return;
@@ -142,7 +154,7 @@ function applyFilters() {
   const location = locationFilter.value;
   const date = dateFilter.value;
 
-  let filtered = window.ALL_EVENTS.filter(evt => {
+  let filtered = window.ALL_EVENTS.filter((evt) => {
     const matchText =
       evt.title.toLowerCase().includes(text) ||
       evt.description.toLowerCase().includes(text);
@@ -150,7 +162,8 @@ function applyFilters() {
     const matchLocation =
       location === "all" || evt.location === location;
 
-    const matchDate = date === "all" || evt.startDate.startsWith(date);
+    const matchDate =
+      date === "all" || evt.startDate.startsWith(date);
 
     return matchText && matchLocation && matchDate;
   });
@@ -159,13 +172,12 @@ function applyFilters() {
 }
 
 // =====================================================
-// PAGINATED LIST RENDERING
+// RENDER PAGINATED LIST
 // =====================================================
 function renderList(events, page = 1) {
   const perPage = 10;
-  const totalPages = Math.ceil(events.length / perPage);
 
-  // Fade-out skeletons first
+  // Animate skeleton fade-out
   const skeletons = eventsList.querySelectorAll(".skeleton-card");
   if (skeletons.length > 0) {
     skeletons.forEach((s, i) => {
@@ -192,7 +204,7 @@ function renderListCore(events, page) {
   const start = (page - 1) * perPage;
   const pageEvents = events.slice(start, start + perPage);
 
-  pageEvents.forEach(evt => {
+  pageEvents.forEach((evt) => {
     const card = document.createElement("div");
     card.className = "event-item";
     card.innerHTML = `
@@ -205,7 +217,7 @@ function renderListCore(events, page) {
     eventsList.appendChild(card);
   });
 
-  // Pagination
+  // Pagination buttons
   for (let i = 1; i <= totalPages; i++) {
     const btn = document.createElement("button");
     btn.textContent = i;
@@ -216,12 +228,12 @@ function renderListCore(events, page) {
 }
 
 // =====================================================
-// MAP MARKER RENDERING
+// MAP MARKERS
 // =====================================================
 function renderMarkers(events) {
   markerCluster.clearLayers();
 
-  events.forEach(evt => {
+  events.forEach((evt) => {
     if (!evt.latitude || !evt.longitude) return;
 
     const marker = L.marker([evt.latitude, evt.longitude]);
@@ -241,4 +253,3 @@ function renderMarkers(events) {
     markerCluster.addLayer(marker);
   });
 }
-
