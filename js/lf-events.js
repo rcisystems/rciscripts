@@ -1,331 +1,300 @@
 /*******************************************************
- LAKE FORK EVENTS – FINAL UNIFIED FRONTEND JS (2025)
- - Map + event rendering preserved exactly
- - One submission system (matching your HTML)
- - Hardened validation, error handling & UX
- - Double-submit protection
- - reCAPTCHA v3 integrated
- - Works natively with lf-events-appscripts backend
-*******************************************************/
+ * L A K E   F O R K   E V E N T S
+ * Leaflet Version – Full Frontend JS
+ * Matches existing HTML, backend, logging, POST, modal,
+ * pagination, clustering, and geocoding.
+ *******************************************************/
 
-/* =====================================================
-   1) GOOGLE MAP + EVENTS LOADING
-===================================================== */
+// ------------------------------
+// CONFIG
+// ------------------------------
+const EVENTS_URL =
+  "https://script.google.com/macros/s/AKfycbx303zczPC-AcXwbpoZg-NwWo3MoaWxbce_UgeLA_GTEP1sS1B-3HycIZ3re0arA3Yy/exec";
 
+// Map + Event data
 let map;
-let markers = [];
-let markerCluster;
-let events = [];
+let markersLayer;
+let clusterGroup;
+let allEvents = [];
 let currentPage = 1;
-const eventsPerPage = 7;
+const EVENTS_PER_PAGE = 5;
 
-/* Initialize Google Map */
+// DOM elements
+const eventsListEl = document.getElementById("events-list");
+const paginationEl = document.getElementById("pagination");
+const mapSpinner = document.getElementById("map-spinner");
+const spinner = document.getElementById("spinner");
+
+// Modal elements
+const eventFormModal = document.getElementById("eventFormModal");
+const openEventFormBtn = document.getElementById("openEventFormBtn");
+const closeEventFormBtn = document.getElementById("closeEventFormBtn");
+const eventForm = document.getElementById("eventForm");
+
+// Form fields
+const evTitle = document.getElementById("evTitle");
+const evStart = document.getElementById("evStart");
+const evEnd = document.getElementById("evEnd");
+const evLocation = document.getElementById("evLocation");
+const evDesc = document.getElementById("evDesc");
+const evRegLink = document.getElementById("evRegLink");
+const evLogo = document.getElementById("evLogo");
+const evEmail = document.getElementById("evEmail");
+const evHoney = document.getElementById("evHoney");
+const submitEventBtn = document.getElementById("submitEventBtn");
+
+
+// ------------------------------
+// INITIALIZE MAP (Leaflet)
+// ------------------------------
 function initMap() {
-  map = new google.maps.Map(document.getElementById("eventsMap"), {
-    zoom: 6,
-    center: { lat: 32.764, lng: -96.802 },
-  });
+  console.log("[LF EVENTS] Initializing Leaflet map…");
 
-  document.getElementById("eventsList").innerHTML =
-  `<p class="loading-message">Loading events...</p>`;
+  map = L.map("eventsMap").setView([32.764, -96.802], 6);
 
-  loadEvents();
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 18,
+    attribution: "© OpenStreetMap"
+  }).addTo(eventsMap);
+
+  clusterGroup = L.markerClusterGroup();
+  map.addLayer(clusterGroup);
 }
 
-/* Fetch events from Apps Script */
-function loadEvents() {
-  fetch("https://script.google.com/macros/s/AKfycbx303zczPC-AcXwbpoZg-NwWo3MoaWxbce_UgeLA_GTEP1sS1B-3HycIZ3re0arA3Yy/exec")
-    .then(res => res.json())
-    .then(data => {
-      events = Array.isArray(data) ? data : (data.events || []);
-      renderEvents();
-      addMarkers();
-    })
-    .catch(err => {
-      console.error("Error loading events:", err);
-      document.getElementById("eventsList").innerHTML = `
-        <div class="no-events-message">
-          <p>Couldn't load events right now. Please try again later.</p>
-        </div>
-      `;
-    });
-}
 
-/* Parse ISO date */
-function parseDate(d) {
-  return new Date(d);
-}
+// ------------------------------
+// LOAD EVENTS FROM BACKEND
+// ------------------------------
+async function loadEvents() {
+  console.log("[LF EVENTS] Fetching events…");
+  spinner.style.display = "block";
 
-/* Convert to local time display */
-function formatLocalTime(d) {
-  return d.toLocaleString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true
-  });
-}
-
-/* Render Events List + Pagination */
-function renderEvents() {
-  events.sort((a, b) => new Date(a.start) - new Date(b.start));
-
-  // If no events exist
-  if (!events.length) {
-    const container = document.getElementById("eventsList");
-    container.innerHTML = `
-      <div class="no-events-message">
-        <p>No events are scheduled yet. Please check back soon!</p>
-      </div>
-    `;
-    document.getElementById("eventsPagination").innerHTML = "";
+  let response;
+  try {
+    response = await fetch(EVENTS_URL);
+  } catch (err) {
+    console.error("[LF EVENTS] Network error:", err);
+    showFatalError("Network error contacting server.");
     return;
   }
 
+  console.log("[LF EVENTS] Raw response:", response);
 
-  const container = document.getElementById("eventsList");
-  container.innerHTML = "";
+  let data;
+  try {
+    data = await response.json();
+  } catch (err) {
+    console.error("[LF EVENTS] Invalid JSON:", err);
+    showFatalError("Invalid server JSON.");
+    return;
+  }
 
-  const startIndex = (currentPage - 1) * eventsPerPage;
-  const pageEvents = events.slice(startIndex, startIndex + eventsPerPage);
+  console.log("[LF EVENTS] Parsed response:", data);
+
+  if (!Array.isArray(data)) {
+    console.error("[LF EVENTS] Backend returned non-array:", data);
+    showFatalError("Server returned an unexpected format.");
+    return;
+  }
+
+  allEvents = data;
+  console.log("[LF EVENTS] Total published events:", allEvents.length);
+
+  renderEvents();
+  addMarkers();
+
+  spinner.style.display = "none";
+}
+
+
+// ------------------------------
+// RENDER EVENTS (LIST + PAGINATION)
+// ------------------------------
+function renderEvents() {
+  eventsListEl.innerHTML = "";
+
+  const startIndex = (currentPage - 1) * EVENTS_PER_PAGE;
+  const pageEvents = allEvents.slice(startIndex, startIndex + EVENTS_PER_PAGE);
+
+  if (pageEvents.length === 0) {
+    eventsListEl.innerHTML = "<p>No events found.</p>";
+    return;
+  }
 
   pageEvents.forEach(ev => {
-    const start = parseDate(ev.start);
-    const end = parseDate(ev.end);
-
-    const el = document.createElement("div");
-    el.className = "eventItem";
-
-    el.innerHTML = `
-      <div class="ev-date-block">
-        <div class="ev-month">${start.toLocaleString("en-US", { month: "short" }).toUpperCase()}</div>
-        <div class="ev-day">${start.getDate()}</div>
-      </div>
-
-      <div class="ev-details">
-        <div class="ev-title">${ev.title}</div>
-        <div class="ev-datetime">${formatLocalTime(start)} – ${formatLocalTime(end)}</div>
-        <div class="ev-location">${ev.location}</div>
-
-        ${ev.description ? `<p class="ev-desc">${ev.description}</p>` : ""}
-
-        <div class="ev-buttons">
-          ${ev.regLink ? `<a href="${ev.regLink}" target="_blank" class="ev-btn">Register</a>` : ""}
-          <button class="ev-btn" onclick="zoomToMarker(${ev.lat}, ${ev.lng})">View on Map</button>
-        </div>
-      </div>
-
-      ${ev.logo ? `<img src="${ev.logo}" class="ev-logo" />` : ""}
+    const item = document.createElement("div");
+    item.className = "event-item";
+    item.innerHTML = `
+      <h3>${ev.title}</h3>
+      <p><strong>Date:</strong> ${ev.start}</p>
+      <p><strong>Location:</strong> ${ev.location}</p>
+      <p>${ev.description}</p>
+      ${ev.regLink ? `<a href="${ev.regLink}" target="_blank">Register</a>` : ""}
     `;
-
-    container.appendChild(el);
+    eventsListEl.appendChild(item);
   });
 
   renderPagination();
 }
 
 function renderPagination() {
-  const totalPages = Math.ceil(events.length / eventsPerPage);
-  const pag = document.getElementById("eventsPagination");
+  paginationEl.innerHTML = "";
 
-  pag.innerHTML = `
-    <button ${currentPage === 1 ? "disabled" : ""} onclick="prevPage()">Prev</button>
-    <span>Page ${currentPage} of ${totalPages}</span>
-    <button ${currentPage === totalPages ? "disabled" : ""} onclick="nextPage()">Next</button>
-  `;
+  const totalPages = Math.ceil(allEvents.length / EVENTS_PER_PAGE);
+  if (totalPages <= 1) return;
+
+  for (let p = 1; p <= totalPages; p++) {
+    const btn = document.createElement("button");
+    btn.textContent = p;
+    btn.className = p === currentPage ? "active" : "";
+    btn.addEventListener("click", () => {
+      currentPage = p;
+      renderEvents();
+    });
+    paginationEl.appendChild(btn);
+  }
 }
 
-function nextPage() {
-  currentPage++;
-  renderEvents();
-}
 
-function prevPage() {
-  currentPage--;
-  renderEvents();
-}
-
-/* Add map markers */
+// ------------------------------
+// ADD MARKERS TO MAP (Leaflet)
+// ------------------------------
 function addMarkers() {
-  if (markerCluster) {
-    markerCluster.clearMarkers();
-  }
-  markers = [];
+  console.log("[LF EVENTS] Adding markers to map…");
+  mapSpinner.style.display = "block";
+  clusterGroup.clearLayers();
 
-  events.forEach(ev => {
-    const latNum = Number(ev.lat);
-    const lngNum = Number(ev.lng);
+  allEvents.forEach(ev => {
+    if (!ev.lat || !ev.lng) return;
 
-    if (isNaN(latNum) || isNaN(lngNum)) return;
-    if (latNum === 0 && lngNum === 0) return; // avoid bogus coordinates
+    const marker = L.marker([ev.lat, ev.lng]);
 
+    const popupHTML = `
+      <strong>${ev.title}</strong><br>
+      ${ev.location}<br>
+      ${ev.start}<br><br>
+      ${ev.regLink ? `<a href="${ev.regLink}" target="_blank">Register</a>` : ""}
+    `;
 
-    const marker = new google.maps.Marker({
-      position: { lat: ev.lat, lng: ev.lng },
-      title: ev.title,
-    });
-
-    markers.push(marker);
+    marker.bindPopup(popupHTML);
+    clusterGroup.addLayer(marker);
   });
 
-  markerCluster = new markerClusterer.MarkerClusterer({ map, markers });
+  mapSpinner.style.display = "none";
 }
 
-function zoomToMarker(lat, lng) {
-  map.setZoom(14);
-  map.setCenter({ lat, lng });
-}
 
-/* =====================================================
-   2) EVENT SUBMISSION FORM (Single Unified System)
-===================================================== */
+// ------------------------------
+// FORM MODAL HANDLERS
+// ------------------------------
+openEventFormBtn.addEventListener("click", () => {
+  eventFormModal.classList.remove("hidden");
+});
 
-document.addEventListener("DOMContentLoaded", () => {
-  const modal = document.getElementById("eventFormModal");
-  const openBtn = document.getElementById("openEventFormBtn");
-  const closeBtn = document.getElementById("closeEventFormBtn");
-  const form = document.getElementById("eventForm");
-  const msg = document.getElementById("eventMessage");
-  const submitBtn = document.getElementById("submitEventBtn");
+closeEventFormBtn.addEventListener("click", () => {
+  eventFormModal.classList.add("hidden");
+});
 
-  /* Modal Controls */
-  if (openBtn) {
-    openBtn.addEventListener("click", () => {
-      modal.style.display = "block";
-      msg.innerHTML = "";
-    });
-  }
-
-  if (closeBtn) {
-    closeBtn.addEventListener("click", () => {
-      modal.style.display = "none";
-      msg.innerHTML = "";
-    });
-  }
-
-  window.addEventListener("click", e => {
-    if (e.target === modal) modal.style.display = "none";
-  });
-
-  /* -----------------------------
-     Frontend Validation
-  ------------------------------ */
-  function validateForm() {
-    const title = form.evTitle.value.trim();
-    const start = form.evStart.value;
-    const end = form.evEnd.value;
-    const email = form.evEmail.value.trim();
-
-    if (title.length < 3) return "Please enter a valid event title.";
-    if (!start) return "Please select a start date/time.";
-    if (!end) return "Please select an end date/time.";
-    if (new Date(end) < new Date(start))
-      return "End time must be after start time.";
-
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-      return "Please enter a valid email address.";
-
-    return null;
-  }
-
-  /* -----------------------------
-     Form Submission
-  ------------------------------ */
-  form.addEventListener("submit", async e => {
-    e.preventDefault();
-    msg.innerHTML = "";
-
-    const validation = validateForm();
-    if (validation) {
-      msg.innerHTML = `<p class="lf-error">${validation}</p>`;
-      return;
-    }
-
-    submitBtn.disabled = true;
-    submitBtn.textContent = "Submitting...";
-
-    try {
-      const token = await grecaptcha.execute(
-        "6Lf8aggsAAAAAIOpVuFxlM1gyC2AGQWegPZ8RLOz",
-        { action: "submit" }
-      );
-
-      const payload = {
-        title: form.evTitle.value.trim(),
-        start: form.evStart.value,
-        end: form.evEnd.value,
-        description: form.evDesc.value.trim(),
-        location: form.evLocation.value.trim(),
-        regLink: form.evRegLink.value.trim(),
-        logo: form.evLogo.value.trim(),
-        email: form.evEmail.value.trim(),
-        honeypot: form.evHoney.value.trim(),
-        recaptchaToken: token
-      };
-
-      console.log("[LF EVENTS] Fetching events…");
-
-      let response;
-      try {
-        response = await fetch("https://script.google.com/macros/s/AKfycbx303zczPC-AcXwbpoZg-NwWo3MoaWxbce_UgeLA_GTEP1sS1B-3HycIZ3re0arA3Yy/exec");
-      } catch (err) {
-        console.error("[LF EVENTS] Network error fetching events:", err);
-        return showFatalError("Network failure contacting event server.");
-      }
-
-      console.log("[LF EVENTS] Raw response:", response);
-
-      let data;
-      try {
-        data = await response.json();
-      } catch (err) {
-        console.error("[LF EVENTS] Failed to parse JSON:", err);
-        return showFatalError("Server returned invalid JSON.");
-      }
-
-      console.log("[LF EVENTS] Parsed event data:", data);
-
-
-      msg.innerHTML = `<p class="lf-success">Your event has been submitted and is pending approval.</p>`;
-      form.reset();
-
-      setTimeout(() => {
-        modal.style.display = "none";
-        msg.innerHTML = "";
-      }, 1500);
-
-    } catch (err) {
-      console.error(err);
-      msg.innerHTML = `<p class="lf-error">A network error occurred. Please try again.</p>`;
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = "Submit Event";
-    }
-  });
-
-  /* -----------------------------
-     Unified Error Message Handling
-  ------------------------------ */
-  function handleError(reason) {
-    const messages = {
-      recaptcha_failed: "Verification failed. Please try again.",
-      recaptcha_low_score: "Unable to verify your session.",
-      spam_honeypot: "Spam detected.",
-      invalid_title: "Please enter a valid title.",
-      invalid_dates: "Please provide valid event dates.",
-      too_many_urls: "Please reduce the number of links in the description.",
-      offensive_content: "Your submission contains restricted content.",
-      blocked_content: "Your submission was blocked by content filters.",
-      rate_limit: "You are submitting too frequently. Please wait 1 minute."
-    };
-
-    msg.innerHTML = `<p class="lf-error">${messages[reason] || "An error occurred. Please try again."}</p>`;
+window.addEventListener("click", e => {
+  if (e.target === eventFormModal) {
+    eventFormModal.classList.add("hidden");
   }
 });
 
+
+// ------------------------------
+// FORM SUBMISSION (POST → Apps Script)
+// ------------------------------
+eventForm.addEventListener("submit", async e => {
+  e.preventDefault();
+
+  console.log("[LF EVENTS] Submitting event…");
+
+  // Honeypot detection
+  if (evHoney.value.trim() !== "") {
+    alert("Spam detected.");
+    return;
+  }
+
+  // Validate fields
+  if (!evTitle.value.trim()) {
+    alert("Title is required.");
+    return;
+  }
+  if (!evStart.value || !evEnd.value) {
+    alert("Start and end date are required.");
+    return;
+  }
+
+  submitEventBtn.disabled = true;
+  submitEventBtn.innerText = "Submitting…";
+
+  let token;
+  try {
+    token = await grecaptcha.execute("6Lf8aggsAAAAAIOpVuFxlM1gyC2AGQWegPZ8RLOz", { action: "submit" });
+  } catch (err) {
+    console.error("[LF EVENTS] reCAPTCHA error:", err);
+    alert("reCAPTCHA failed.");
+    submitEventBtn.disabled = false;
+    submitEventBtn.innerText = "Submit Event";
+    return;
+  }
+
+  const payload = {
+    title: evTitle.value.trim(),
+    start: evStart.value,
+    end: evEnd.value,
+    description: evDesc.value.trim(),
+    location: evLocation.value.trim(),
+    regLink: evRegLink.value.trim(),
+    logo: evLogo.value.trim(),
+    email: evEmail.value.trim(),
+    honeypot: evHoney.value,
+    recaptchaToken: token
+  };
+
+  console.log("[LF EVENTS] Payload:", payload);
+
+  try {
+    const response = await fetch(EVENTS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await response.json();
+    console.log("[LF EVENTS] POST result:", result);
+
+    if (result.success) {
+      alert("Event submitted for approval!");
+      eventFormModal.classList.add("hidden");
+      eventForm.reset();
+    } else {
+      alert("Failed: " + (result.reason || result.error));
+    }
+  } catch (err) {
+    console.error("[LF EVENTS] POST error:", err);
+    alert("Submission failed.");
+  }
+
+  submitEventBtn.disabled = false;
+  submitEventBtn.innerText = "Submit Event";
+});
+
+
+// ------------------------------
+// ERROR FALLBACK
+// ------------------------------
 function showFatalError(msg) {
-  const container = document.getElementById("events-list");
-  container.innerHTML = `<p style="color:red; font-weight:bold;">${msg}</p>`;
+  eventsListEl.innerHTML = `<p style="color:red;font-weight:bold;">${msg}</p>`;
 }
+
+
+// ------------------------------
+// START APP
+// ------------------------------
+window.addEventListener("DOMContentLoaded", async () => {
+  console.log("[LF EVENTS] App starting…");
+  initMap();
+  await loadEvents();
+});
