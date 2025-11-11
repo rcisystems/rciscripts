@@ -1,5 +1,6 @@
 console.log("LF-EVENTS JS LOADED");
 console.log("Before DOMContentLoaded hook");
+console.log("Is L defined at load?", typeof L);
 
 
 /************************************************************
