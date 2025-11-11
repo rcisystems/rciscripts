@@ -52,6 +52,14 @@ const evEmail = document.getElementById("evEmail");
 const evHoney = document.getElementById("evHoney");
 const submitEventBtn = document.getElementById("submitEventBtn");
 
+console.log("openEventFormBtn:", openEventFormBtn);
+console.log("closeEventFormBtn:", closeEventFormBtn);
+console.log("eventForm:", eventForm);
+console.log("submitEventBtn:", submitEventBtn);
+console.log("mapSpinner:", mapSpinner);
+console.log("eventsListEl:", eventsListEl);
+console.log("paginationEl:", paginationEl);
+console.log("spinner:", spinner);
 
 /************************************************************
  * MAP INITIALIZATION
