@@ -1,10 +1,10 @@
 /* ============================================================
-   Lake Fork Events Frontend v5 (Final)
+   Lake Fork Events Frontend v6 (Final Patched)
    ------------------------------------------------------------
-   Fixes:
-   - Handles nested {events: {events: []}} structure
-   - Added detailed logging + graceful fallback
-   - Keeps stable map + filters
+   - Fixes null container crash
+   - Auto-creates map & list containers
+   - Handles nested {events:{events:[]}}
+   - Defers init to post-hydration
    ============================================================ */
 
 console.log("LF-EVENTS JS LOADED");
@@ -30,12 +30,15 @@ document.addEventListener("DOMContentLoaded", () => {
 /* ---------- Defer init until after hydration ---------- */
 window.addEventListener("load", () => {
   console.log("Window load fired — scheduling init after hydration.");
-  requestAnimationFrame(() => setTimeout(init, 120));
+  requestAnimationFrame(() => setTimeout(init, 150));
 });
 
 /* ---------- Init ---------- */
 async function init() {
   console.log("Init starting…");
+
+  // Ensure containers exist even if React wipes DOM
+  ensureContainers();
 
   const dom = {
     searchInput: document.querySelector("#search"),
@@ -51,11 +54,29 @@ async function init() {
   showSkeleton(dom.eventsList);
   await fetchAndRenderEvents(dom);
 
-  // Debounced filter
   const debounced = debounce(() => applyFilters(dom), 250);
   Object.values(dom).forEach((el) => {
     if (el) el.addEventListener("input", debounced);
   });
+}
+
+/* ---------- Ensure Containers ---------- */
+function ensureContainers() {
+  if (!document.querySelector("#eventsList")) {
+    const listDiv = document.createElement("div");
+    listDiv.id = "eventsList";
+    listDiv.className = "events-list";
+    document.body.appendChild(listDiv);
+    console.warn("Auto-created #eventsList container.");
+  }
+
+  if (!document.querySelector("#eventsMap")) {
+    const mapDiv = document.createElement("div");
+    mapDiv.id = "eventsMap";
+    mapDiv.className = "events-map";
+    document.body.appendChild(mapDiv);
+    console.warn("Auto-created #eventsMap container.");
+  }
 }
 
 /* ---------- Map ---------- */
@@ -84,7 +105,7 @@ async function fetchAndRenderEvents(dom) {
     const data = await res.json();
     console.log("Raw API response:", data);
 
-    // Handle nested or flat array structures
+    // Handle nested or flat structures
     let eventsArray = [];
     if (Array.isArray(data.events)) {
       eventsArray = data.events;
@@ -95,13 +116,14 @@ async function fetchAndRenderEvents(dom) {
     }
 
     if (!Array.isArray(eventsArray)) {
-      throw new Error("Invalid event data structure");
+      throw new Error("Invalid event data");
     }
 
     allEvents = eventsArray;
     console.log(`Loaded ${allEvents.length} events.`);
 
     hideSkeleton(dom.eventsList);
+
     if (!allEvents.length) {
       renderEmptyState(dom.eventsList);
       return;
@@ -207,10 +229,18 @@ function hideSkeleton(container) {
 }
 
 function renderEmptyState(container) {
+  if (!container) {
+    console.warn("renderEmptyState called with null container");
+    return;
+  }
   container.innerHTML = `<p class="empty-msg">No events found — check back soon!</p>`;
 }
 
 function renderError(container, msg) {
+  if (!container) {
+    console.warn("renderError called with null container");
+    return;
+  }
   container.innerHTML = `<p class="error-msg">⚠️ Error loading events: ${msg}</p>`;
 }
 
