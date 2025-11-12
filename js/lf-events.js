@@ -6,7 +6,7 @@ console.log("LF-EVENTS JS LOADED");
 
 // ---- GLOBAL CONFIG ----
 const BASE_API_URL =
-  "https://script.google.com/macros/s/AKfycbyMIl5cn8s1NcsNxUoToWEFtYu_JvxGhN9DDkzU9AOfwbZ3rH9qV3sZPgr9vOs6VyEY/exec";
+  "https://script.google.com/macros/s/AKfycbx6D4Z-P-fN66SbRH0H8p_aQXL22cSIBslJEGk9-49OvNJanrJjXi3MMH_x_4PBuX1h/exec";
 const EVENTS_API_URL = BASE_API_URL.includes("?")
   ? BASE_API_URL + "&action=getEvents"
   : BASE_API_URL + "?action=getEvents";
