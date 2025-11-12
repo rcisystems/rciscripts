@@ -1,164 +1,47 @@
-// === Lake Fork Events ===
-// Updated to support flexible API structure and improved rendering
+// === LAKE FORK EVENTS ===
 console.log("LF-EVENTS JS LOADED");
 
-window.addEventListener("load", () => {
-  console.log("Window load fired — initializing...");
-  init();
-});
-
-// ---- GLOBALS ----
 let map;
+let allEvents = [];
 
-// ---- INIT ----
+// === INITIALIZATION ===
 function init() {
   console.log("Init starting…");
 
-  const root = document.querySelector("#events-root");
-  const mapContainer = document.querySelector("#eventsMap");
-  const showPastCheckbox = document.querySelector("#showPast");
+  const root = document.getElementById("events-root");
+  const mapContainer = document.getElementById("eventsMap");
+  const showPast = document.getElementById("showPast");
+  const searchInput = document.getElementById("eventSearch");
 
   if (!root) {
-    console.error("Missing #events-root");
+    console.error("Missing events-root element");
     return;
   }
 
-  console.log("DOM references assigned:", { root, map: mapContainer, showPast: showPastCheckbox });
+  const dom = { root, map: mapContainer, showPast, searchInput };
+  console.log("DOM references assigned:", dom);
 
   // Initialize map
-  map = L.map(mapContainer).setView([32.8, -95.6], 10);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "© OpenStreetMap contributors",
-  }).addTo(map);
-  console.log("Map initialized.");
+  if (mapContainer) initMap();
 
-  // Fetch and render
-  fetchAndRenderEvents(root);
+  // Fetch and render events
+  fetchAndRenderEvents(dom);
 
-  // Hook up toggle
-  if (showPastCheckbox) {
-    showPastCheckbox.addEventListener("change", () => fetchAndRenderEvents(root, showPastCheckbox.checked));
+  // Listeners
+  if (showPast) {
+    showPast.addEventListener("change", () => renderFiltered(dom));
+  }
+  if (searchInput) {
+    searchInput.addEventListener("input", () => renderFiltered(dom));
   }
 }
 
-// ---- FETCH ----
-async function fetchAndRenderEvents(container, showPast = false) {
-  const url =
-    "https://script.google.com/macros/s/AKfycbx6D4Z-P-fN66SbRH0H8p_aQXL22cSIBslJEGk9-49OvNJanrJjXi3MMH_x_4PBuX1h/exec?action=getEvents";
-  console.log("Fetching events…", url);
+window.addEventListener("load", () => {
+  console.log("Window load fired — initializing...");
+  setTimeout(() => init(), 800); // ✅ Delay allows GHL hydration to finish
+});
 
-  try {
-    const res = await fetch(url);
-    const data = await res.json();
-    console.log("Raw API response:", data);
-
-    if (data.success && data.events) {
-      const evtData =
-        data.events.allEvents || data.events.events || [];
-      handleEventsResponse({ allEvents: evtData, showPast });
-    } else {
-      console.warn("No events found in API response", data);
-      renderEmptyState(container);
-    }
-  } catch (err) {
-    console.error("Error fetching events:", err);
-    renderEmptyState(container);
-  }
-}
-
-// ---- RENDER ----
-function handleEventsResponse({ allEvents, showPast }) {
-  const container = document.querySelector("#events-root");
-  if (!container) return;
-
-  if (!allEvents || !allEvents.length) {
-    console.warn("No events found.");
-    renderEmptyState(container);
-    return;
-  }
-
-  const now = new Date();
-  let filtered = allEvents.filter(ev => {
-    const start = new Date(ev.startDate);
-    return showPast ? start < now : start >= now;
-  });
-
-  filtered = filtered.sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
-
-  renderEvents(container, filtered);
-}
-
-// ---- EMPTY STATE ----
-function renderEmptyState(container) {
-  container.innerHTML = `
-    <div class="no-events">
-      <p>No events found. Please check back soon!</p>
-    </div>
-  `;
-}
-
-// ---- RENDERERS ----
-function renderEvents(container, events) {
-  if (!container) {
-    console.error("No container to render events into.");
-    return;
-  }
-
-  if (!events || !events.length) {
-    return renderEmptyState(container);
-  }
-
-  container.innerHTML = events
-    .map(ev => {
-      const start = new Date(ev.startDate);
-      const end = ev.endDate ? new Date(ev.endDate) : null;
-      const dateStr = start.toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-      const endStr = end
-        ? end.toLocaleDateString(undefined, { month: "short", day: "numeric" })
-        : "";
-
-      const title = ev.link
-        ? `<a href="${ev.link}" target="_blank" rel="noopener">${ev.title}</a>`
-        : ev.title;
-
-      const logo = ev.logo
-        ? `<div class="event-logo"><img src="${ev.logo}" alt="${ev.title} logo"></div>`
-        : "";
-
-     return `
-      <div class="event-card">
-        ${ev.logo ? `<img src="${ev.logo}" alt="Event Logo" class="event-logo" loading="lazy">` : ""}
-        <h3>${ev.link ? `<a href="${ev.link}" target="_blank" rel="noopener">${ev.title}</a>` : ev.title}</h3>
-        <p class="event-date">${dateStr}</p>
-        <p class="event-location">${ev.location || ""}</p>
-        <p class="event-description">${ev.description || ""}</p>
-      </div>
-    `;
-    })
-    .join("");
-
-  // Update map markers
-  if (map && events.length) {
-    map.eachLayer(layer => {
-      if (layer instanceof L.Marker) map.removeLayer(layer);
-    });
-
-    events.forEach(ev => {
-      if (ev.lat && ev.lng) {
-        const marker = L.marker([ev.lat, ev.lng]).addTo(map);
-        const popup = `<b>${ev.title}</b><br>${ev.location || ""}`;
-        marker.bindPopup(popup);
-      }
-    });
-  }
-
-  console.log(`Rendered ${events.length} events.`);
-}
-
+// === MAP ===
 function initMap() {
   const mapElement = document.getElementById("eventsMap");
   if (!mapElement) return;
@@ -172,32 +55,139 @@ function initMap() {
 
   console.log("Map initialized.");
 
-  // 🧩 Force redraw after delay to ensure tiles fully render
-  setTimeout(() => {
-    map.invalidateSize();
-  }, 500);
-
-  // 🧩 Also re-render when window resizes or GoHighLevel adjusts layout
+  // Force redraw
+  setTimeout(() => map.invalidateSize(), 500);
   window.addEventListener("resize", () => map.invalidateSize());
 }
 
-// === OBSERVE LAYOUT CHANGES TO FIX MISSING MAP TILES ===
+// === FETCH EVENTS ===
+async function fetchAndRenderEvents(dom) {
+  try {
+    const url =
+      "https://script.google.com/macros/s/AKfycbx6D4Z-P-fN66SbRH0H8p_aQXL22cSIBslJEGk9-49OvNJanrJjXi3MMH_x_4PBuX1h/exec?action=getEvents";
+    console.log("Fetching events…", url);
+
+    const res = await fetch(url);
+    const data = await res.json();
+    console.log("Raw API response:", data);
+
+    if (data.success && data.events && data.events.allEvents) {
+      allEvents = data.events.allEvents.filter(ev => ev.status?.toLowerCase() === "publish");
+      renderFiltered(dom);
+    } else {
+      console.warn("API did not return success:true", data);
+      renderEmptyState(dom.root);
+    }
+  } catch (err) {
+    console.error("Failed to load events:", err);
+    renderError(dom.root);
+  }
+}
+
+// === FILTER & SEARCH ===
+function renderFiltered(dom) {
+  const showPast = dom.showPast?.checked;
+  const searchTerm = dom.searchInput?.value?.toLowerCase() || "";
+  const now = new Date();
+
+  const filtered = allEvents.filter(ev => {
+    const isPast = new Date(ev.endDate) < now;
+    const matchesPast = showPast || !isPast;
+    const matchesSearch =
+      ev.title?.toLowerCase().includes(searchTerm) ||
+      ev.description?.toLowerCase().includes(searchTerm) ||
+      ev.location?.toLowerCase().includes(searchTerm);
+    return matchesPast && matchesSearch;
+  });
+
+  renderEvents(dom.root, filtered);
+}
+
+// === RENDERERS ===
+function renderEvents(container, events) {
+  if (!container) return;
+  if (!events || !events.length) return renderEmptyState(container);
+
+  container.innerHTML = events
+    .map(ev => {
+      const dateStart = new Date(ev.startDate);
+      const dateEnd = ev.endDate ? new Date(ev.endDate) : null;
+      const dateStr = dateEnd
+        ? `${dateStart.toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+          })} - ${dateEnd.toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+          })}`
+        : dateStart.toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          });
+
+      const linkHTML = ev.link
+        ? `<a href="${ev.link}" target="_blank" class="event-link">${ev.title}</a>`
+        : ev.title;
+
+      const logoHTML = ev.logo
+        ? `<img src="${ev.logo}" alt="${ev.title}" class="event-logo" loading="lazy" />`
+        : "";
+
+      return `
+        <div class="event-card">
+          ${logoHTML}
+          <div class="event-content">
+            <h3>${linkHTML}</h3>
+            <p class="event-date">${dateStr}</p>
+            <p class="event-location">${ev.location || ""}</p>
+            <p class="event-description">${ev.description || ""}</p>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  // Update map markers
+  if (map && events.length) {
+    map.eachLayer(layer => {
+      if (layer instanceof L.Marker) map.removeLayer(layer);
+    });
+
+    events.forEach(ev => {
+      if (ev.lat && ev.lng) {
+        L.marker([ev.lat, ev.lng])
+          .addTo(map)
+          .bindPopup(`<b>${ev.title}</b><br>${ev.location}`);
+      }
+    });
+  }
+
+  console.log(`Rendered ${events.length} events.`);
+}
+
+function renderEmptyState(container) {
+  container.innerHTML = `
+    <div class="no-events">
+      <p>No events found. Please check back soon!</p>
+    </div>`;
+}
+
+function renderError(container) {
+  container.innerHTML = `
+    <div class="error-state">
+      <p>There was a problem loading events. Please try again later.</p>
+    </div>`;
+}
+
+// === OBSERVE DOM FOR LAYOUT CHANGES ===
 const observer = new MutationObserver(() => {
   if (map && map._loaded) {
     map.invalidateSize();
   }
 });
+observer.observe(document.body, { attributes: true, childList: true, subtree: true });
 
-// Observe DOM changes so if GoHighLevel or container reflows, Leaflet recalculates tiles
-observer.observe(document.body, {
-  attributes: true,
-  childList: true,
-  subtree: true
-});
-
-// Also handle tab visibility or delayed layout rendering
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden && map) {
-    map.invalidateSize();
-  }
+  if (!document.hidden && map) map.invalidateSize();
 });
