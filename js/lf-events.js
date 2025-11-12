@@ -1,186 +1,168 @@
-/* ===============================
-   Lake Fork Events – FINAL PATCH
-   =============================== */
+// ======================================================
+// Lake Fork Events — Diagnostic & Stable Build
+// ======================================================
 
 console.log("LF-EVENTS JS LOADED");
 
-const API_URL =
+// ---- GLOBAL CONFIG ----
+const EVENTS_API_URL =
   "https://script.google.com/macros/s/AKfycbyMIl5cn8s1NcsNxUoToWEFtYu_JvxGhN9DDkzU9AOfwbZ3rH9qV3sZPgr9vOs6VyEY/exec";
-
-let allEvents = [];
-let filteredEvents = [];
 let map;
 
+// ---- ON LOAD ----
 window.addEventListener("load", () => {
   console.log("Window load fired — initializing...");
-  init();
+  requestAnimationFrame(init);
 });
 
-async function init() {
+// ---- INIT ----
+function init() {
   console.log("Init starting…");
 
-  const refs = {
-    root: document.getElementById("events-root"),
-    map: document.getElementById("eventsMap"),
-    search: document.getElementById("searchInput"),
-    location: document.getElementById("locationFilter"),
-    showPast: document.getElementById("showPast"),
-  };
+  const root = document.getElementById("events-root");
+  const mapContainer = document.getElementById("eventsMap");
+  const showPast = document.getElementById("showPast");
 
-  if (!refs.root) {
-    console.error("Missing #events-root");
+  if (!root || !mapContainer) {
+    console.error("Missing events container or map container element");
     return;
   }
 
-  initMap(refs.map);
-  await fetchEvents(refs.root);
+  console.log("DOM references assigned:", { root, map: mapContainer, showPast });
 
-  refs.search?.addEventListener("input", () => applyFilters(refs));
-  refs.location?.addEventListener("change", () => applyFilters(refs));
-  refs.showPast?.addEventListener("change", () => applyFilters(refs));
-}
-
-// ---- MAP ----
-function initMap(mapEl) {
-  if (!mapEl) return;
-  map = L.map(mapEl).setView([32.794, -95.561], 9);
+  // Initialize map
+  map = L.map(mapContainer).setView([32.8, -95.55], 10);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 18,
-    attribution: "&copy; OpenStreetMap contributors",
+    attribution: '&copy; <a href="https://osm.org">OpenStreetMap</a> contributors',
   }).addTo(map);
   console.log("Map initialized.");
+
+  // Fetch and render events
+  fetchAndRenderEvents(showPast?.checked || false);
+
+  // Handle past events toggle
+  if (showPast) {
+    showPast.addEventListener("change", () => {
+      fetchAndRenderEvents(showPast.checked);
+    });
+  }
 }
 
-// ---- FETCH ----
-async function fetchEvents(container) {
-  console.log("Fetching events…", API_URL);
+// ---- FETCH + RENDER ----
+async function fetchAndRenderEvents(includePast = false) {
+  console.log("Fetching events…", EVENTS_API_URL);
   try {
-    const res = await fetch(API_URL, { cache: "no-store" });
+    const res = await fetch(EVENTS_API_URL);
     const data = await res.json();
-    console.log("Raw API response:", data);
 
-    const events = data?.events?.allEvents || data?.events || [];
-    allEvents = Array.isArray(events) ? events : [];
+    // Store globally for debugging
+    window.lastEventsResponse = data;
+    console.log("Raw API response:", JSON.stringify(data, null, 2));
 
-    if (!allEvents.length) {
-      renderEmptyState(container);
+    // Adapt to any response shape
+    const allEvents =
+      data?.events?.allEvents ||
+      data?.allEvents ||
+      data?.events ||
+      [];
+
+    if (!data.success) {
+      console.warn("API did not return success:true", data);
+      renderError(document.getElementById("events-root"), "API Error");
       return;
     }
 
-    populateLocationFilter(allEvents);
-    filteredEvents = filterAndSearchEvents(allEvents);
-    renderEvents(container, filteredEvents);
+    if (!Array.isArray(allEvents) || !allEvents.length) {
+      console.warn("No events found.");
+      renderEmptyState(document.getElementById("events-root"));
+      return;
+    }
+
+    const now = new Date();
+    const upcoming = allEvents.filter(ev => {
+      const d = parseDate(ev.date);
+      return d && d >= now;
+    });
+    const past = allEvents.filter(ev => {
+      const d = parseDate(ev.date);
+      return d && d < now;
+    });
+
+    const eventsToShow = includePast ? [...upcoming, ...past] : upcoming;
+
+    renderEvents(document.getElementById("events-root"), eventsToShow);
   } catch (err) {
     console.error("Failed to load events:", err);
-    renderError(container, "Error loading events. Please try again later.");
+    renderError(document.getElementById("events-root"), err.message);
   }
 }
 
-// ---- FILTER LOGIC ----
-function applyFilters(refs) {
-  filteredEvents = filterAndSearchEvents(
-    allEvents,
-    refs.search.value,
-    refs.location.value,
-    refs.showPast.checked
-  );
-  renderEvents(refs.root, filteredEvents);
+// ---- HELPERS ----
+function parseDate(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? null : d;
 }
 
-function filterAndSearchEvents(events, searchTerm = "", location = "", includePast = false) {
-  const now = new Date();
-  const term = searchTerm.toLowerCase().trim();
-
-  return events
-    .filter(ev => {
-      const evDate = new Date(ev.date);
-      const matchesTime = includePast ? true : evDate >= now;
-      const matchesSearch =
-        !term ||
-        (ev.title && ev.title.toLowerCase().includes(term)) ||
-        (ev.location && ev.location.toLowerCase().includes(term)) ||
-        (ev.description && ev.description.toLowerCase().includes(term));
-      const matchesLocation = !location || ev.location === location;
-      return matchesTime && matchesSearch && matchesLocation;
-    })
-    .sort((a, b) => new Date(a.date) - new Date(b.date))
-    .slice(0, 20);
-}
-
-function populateLocationFilter(events) {
-  const select = document.getElementById("locationFilter");
-  if (!select) return;
-  const locations = [...new Set(events.map(e => e.location).filter(Boolean))].sort();
-  select.innerHTML =
-    `<option value="">All Locations</option>` +
-    locations.map(loc => `<option value="${loc}">${loc}</option>`).join("");
-}
-
-// ---- RENDER ----
+// ---- RENDERERS ----
 function renderEvents(container, events) {
-  if (!container) return;
-  container.innerHTML = "";
+  if (!container) return console.error("No container to render events into.");
+  if (!events || !events.length) return renderEmptyState(container);
 
-  if (!events || !events.length) {
-    renderEmptyState(container);
-    return;
-  }
-
-  const html = events
+  container.innerHTML = events
     .map(ev => {
-      const date = new Date(ev.date);
-      const dateStr = date.toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-      const safeDesc = ev.description ? ev.description.replace(/\n/g, "<br>") : "";
-      const titleHTML = ev.link
-        ? `<a href="${ev.link}" target="_blank" rel="noopener noreferrer">${ev.title || "Untitled Event"}</a>`
-        : ev.title || "Untitled Event";
+      const date = parseDate(ev.date);
+      const dateStr = date
+        ? date.toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })
+        : "TBD";
+
+      const link = ev.link ? `<a href="${ev.link}" target="_blank">${ev.title}</a>` : ev.title;
 
       return `
-        <div class="event-card" data-lat="${ev.lat || ""}" data-lng="${ev.lng || ""}">
-          <h3 class="event-title">${titleHTML}</h3>
+        <div class="event-card">
+          <h3>${link || "Untitled Event"}</h3>
           <p class="event-date">${dateStr}</p>
           <p class="event-location">${ev.location || ""}</p>
-          <p class="event-description">${safeDesc}</p>
+          <p class="event-description">${ev.description || ""}</p>
         </div>
       `;
     })
     .join("");
 
-  container.innerHTML = html;
+  // ---- MAP MARKERS ----
+  if (map && events.length) {
+    map.eachLayer(layer => {
+      if (layer instanceof L.Marker) map.removeLayer(layer);
+    });
 
-  if (!map) return;
-
-  map.eachLayer(layer => {
-    if (layer instanceof L.Marker) map.removeLayer(layer);
-  });
-
-  const markers = [];
-  events.forEach(ev => {
-    if (ev.lat && ev.lng) {
-      const marker = L.marker([ev.lat, ev.lng])
-        .addTo(map)
-        .bindPopup(`<b>${ev.title}</b><br>${ev.location || ""}`);
-      markers.push(marker);
-    }
-  });
-
-  if (markers.length) {
-    const group = new L.featureGroup(markers);
-    map.fitBounds(group.getBounds(), { padding: [30, 30] });
+    events.forEach(ev => {
+      if (ev.lat && ev.lng) {
+        L.marker([ev.lat, ev.lng])
+          .addTo(map)
+          .bindPopup(`<b>${ev.title}</b><br>${ev.location}`);
+      }
+    });
   }
 
   console.log(`Rendered ${events.length} events.`);
 }
 
-// ---- STATES ----
 function renderEmptyState(container) {
-  container.innerHTML = `<div class="empty-state">No matching events found.</div>`;
+  container.innerHTML = `
+    <div class="event-card empty">
+      <p>No events found. Please check back soon!</p>
+    </div>
+  `;
 }
 
-function renderError(container, msg) {
-  container.innerHTML = `<div class="error-state"><p>${msg}</p></div>`;
+function renderError(container, errorMsg) {
+  container.innerHTML = `
+    <div class="event-card error">
+      <p>⚠️ Error loading events: ${errorMsg}</p>
+    </div>
+  `;
 }
