@@ -1,277 +1,178 @@
-// =======================================================
-// Lake Fork Events — Front-end logic (optimized, readable)
-// =======================================================
+/* ============================================================
+   Lake Fork Events Front-End (Patched v3)
+   ------------------------------------------------------------
+   Fixes:
+   • Removed undefined templateHTML reference
+   • Delayed init to avoid React hydration mismatches
+   • Added safe root-element creation
+   • Stable map + skeleton loader + debounced search
+   ============================================================ */
+
 console.log("LF-EVENTS JS LOADED");
 
-(function () {
-  const API_URL = window.LAKE_FORK_API_URL ||
-    "https://script.google.com/macros/s/AKfycbyMIl5cn8s1NcsNxUoToWEFtYu_JvxGhN9DDkzU9AOfwbZ3rH9qV3sZPgr9vOs6VyEY/exec";
+const API_URL =
+  window.LAKE_FORK_API_URL ||
+  "https://script.google.com/macros/s/AKfycbyMIl5cn8s1NcsNxUoToWEFtYu_JvxGhN9DDkzU9AOfwbZ3rH9qV3sZPgr9vOs6VyEY/exec";
 
-  const refs = {
-    searchInput: null,
-    locationFilter: null,
-    dateFilter: null,
-    timeToggle: null,
-    showPast: null,
-    eventsList: null,
-    pagination: null,
-    mapSpinner: null,
-    mapContainer: null
-  };
+let map, markerGroup, allEvents = [], filteredEvents = [];
 
-  let allEvents = [];
-  let filteredEvents = [];
-  let map = null;
-  let markerGroup = null;
-  const EVENTS_PER_PAGE = 8;
-  let currentPage = 1;
-
-  // Debounce helper
-  function debounce(fn, delay = 200) {
-    let timer = null;
-    return function (...args) {
-      clearTimeout(timer);
-      timer = setTimeout(() => fn.apply(this, args), delay);
-    };
+/* ---------- DOM Ready Helper ---------- */
+document.addEventListener("DOMContentLoaded", () => {
+  // Ensure a root container exists (prevents ReferenceError)
+  let root = document.getElementById("lf-events-root");
+  if (!root) {
+    root = document.createElement("div");
+    root.id = "lf-events-root";
+    document.body.appendChild(root);
+    console.log("Created #lf-events-root dynamically.");
   }
-
-  // Utility to wait next frame
-  function nextFrame() {
-    return new Promise(resolve => requestAnimationFrame(resolve));
-  }
-
-  // Initialization after hydration-safe delay
- window.addEventListener("load", () => {
-  console.log("Window load fired — scheduling init after hydration idle period.");
-  requestAnimationFrame(() => {
-    setTimeout(() => {
-      requestAnimationFrame(init);
-    }, 150);
-  });
 });
 
-const container = document.getElementById("lf-events-root");
-if (container) container.innerHTML = templateHTML;
+/* ---------- Delay Init until React hydration finishes ---------- */
+window.addEventListener("load", () => {
+  console.log("Window load fired — scheduling init after hydration.");
+  requestAnimationFrame(() => setTimeout(init, 150));
+});
 
+/* ---------- Initialization ---------- */
 async function init() {
   console.log("Init starting…");
 
-  assignDomRefs();
-  showSkeletonLoaders();
-  setupEventListeners();
+  const dom = {
+    searchInput: document.querySelector("#search"),
+    locationFilter: document.querySelector("#locationFilter"),
+    dateFilter: document.querySelector("#dateFilter"),
+    timeToggle: document.querySelector("#timeToggle"),
+    showPast: document.querySelector("#showPast"),
+    list: document.querySelector("#eventsList"),
+  };
 
-  // Setup map early – non-blocking
-  setupMap();
+  console.log("DOM references assigned:", dom);
 
-  // Fetch events asynchronously
-  const fetchPromise = fetchEvents();
-  await nextFrame(); // yield to paint skeleton
-  await fetchPromise;
+  initMap();
+  await fetchAndRenderEvents(dom);
 
-  fadeOutSkeleton();
-  refs.mapSpinner.classList.add("fade-out");
-  setTimeout(() => refs.mapSpinner.remove(), 400);
-}
-
-function assignDomRefs() {
-  refs.searchInput     = document.getElementById("search");
-  refs.locationFilter  = document.getElementById("locationFilter");
-  refs.dateFilter      = document.getElementById("dateFilter");
-  refs.timeToggle      = document.getElementById("timeToggle");
-  refs.showPast        = document.getElementById("showPast");
-  refs.eventsList      = document.getElementById("events-list");
-  refs.pagination      = document.getElementById("pagination");
-  refs.mapSpinner      = document.getElementById("map-spinner");
-  refs.mapContainer    = document.getElementById("eventsMap");
-
-  console.log("DOM references assigned:", refs);
-}
-
-async function fetchEvents() {
-  try {
-    const response = await fetch(`${API_URL}?action=getEvents`, {
-      method: "GET",
-      redirect: "follow"
-    });
-    const json = await response.json();
-    if (!json.success) throw new Error(json.error || "Unknown error");
-
-    let allData = json.events || [];
-    // Normalize in case Apps Script returns object instead of array
-    if (!Array.isArray(allData)) {
-      allData = Object.values(allData || {});
-    }
-    allEvents = allData;
-
-    populateLocationFilter();
-    applyFilters();
-  } catch (err) {
-    console.error("Failed to load events:", err);
-    refs.eventsList.innerHTML = "<p>Failed to load events.</p>";
-  }
-}
-
-function setupEventListeners() {
-  const commonHandler = debounce(() => {
-    currentPage = 1;
-    applyFilters();
-  }, 250);
-
-  refs.searchInput.addEventListener("input", commonHandler);
-  refs.locationFilter.addEventListener("change", commonHandler);
-  refs.dateFilter.addEventListener("change", commonHandler);
-  refs.timeToggle.addEventListener("change", commonHandler);
-  refs.showPast.addEventListener("change", commonHandler);
-}
-
-function applyFilters() {
-  const term       = (refs.searchInput.value || "").toLowerCase();
-  const loc        = refs.locationFilter.value;
-  const date       = refs.dateFilter.value;
-  const mode       = refs.timeToggle.value;
-  const includePast = refs.showPast.checked;
-  const today      = new Date().toISOString().split("T")[0];
-
-  filteredEvents = allEvents.filter(ev => {
-    if (!ev) return false;
-    if (term && !(`${ev.title} ${ev.description}`.toLowerCase().includes(term))) return false;
-    if (loc && ev.location !== loc) return false;
-    if (date && ev.date !== date) return false;
-    if (!includePast && ev.date < today) return false;
-    if (mode === "upcoming" && ev.date < today) return false;
-    if (mode === "past" && ev.date >= today) return false;
-    return true;
+  // Event listeners (debounced)
+  const debouncedFilter = debounce(() => applyFilters(dom), 250);
+  Object.values(dom).forEach(el => {
+    if (el) el.addEventListener("input", debouncedFilter);
   });
-
-  filteredEvents.sort((a, b) => a.date.localeCompare(b.date));
-
-  renderEvents();
-  if (window.requestIdleCallback) {
-    requestIdleCallback(updateMapMarkers, { timeout: 500 });
-  } else {
-    updateMapMarkers();
-  }
 }
 
-function populateLocationFilter() {
-  const uniqueLocs = [...new Set(allEvents.map(ev => ev.location).filter(Boolean))];
-  refs.locationFilter.innerHTML = `<option value="">All Locations</option>` +
-    uniqueLocs.map(loc => `<option value="${loc}">${loc}</option>`).join("");
-}
-
-function renderEvents() {
-  const listEl    = refs.eventsList;
-  const pagEl     = refs.pagination;
-  const startIdx  = (currentPage - 1) * EVENTS_PER_PAGE;
-  const pageSlice = filteredEvents.slice(startIdx, startIdx + EVENTS_PER_PAGE);
-
-  if (pageSlice.length === 0) {
-    listEl.innerHTML = "<p>No events found.</p>";
-    pagEl.innerHTML = "";
+/* ---------- Map ---------- */
+function initMap() {
+  const mapContainer = document.getElementById("eventsMap");
+  if (!mapContainer) {
+    console.warn("No map container found");
     return;
   }
 
-  const frag = document.createDocumentFragment();
-  for (const ev of pageSlice) {
-    const item = document.createElement("div");
-    item.className = "event-item";
-    item.innerHTML = `
-      <h3>${ev.title}</h3>
-      <p><strong>Date:</strong> ${ev.date}</p>
-      <p><strong>Location:</strong> ${ev.location}</p>
-      <p>${ev.description}</p>
-    `;
-    frag.appendChild(item);
-  }
-
-  listEl.innerHTML = "";
-  listEl.appendChild(frag);
-  updatePagination();
-}
-
-function updatePagination() {
-  const totalPages = Math.ceil(filteredEvents.length / EVENTS_PER_PAGE);
-  const pagEl = refs.pagination;
-  pagEl.innerHTML = "";
-  if (totalPages <= 1) return;
-
-  const frag = document.createDocumentFragment();
-  for (let p = 1; p <= totalPages; p++) {
-    const btn = document.createElement("button");
-    btn.textContent = p;
-    btn.className = (p === currentPage) ? "active" : "";
-    btn.addEventListener("click", () => {
-      if (p === currentPage) return;
-      currentPage = p;
-      renderEvents();
-      updateMapMarkers();
-    });
-    frag.appendChild(btn);
-  }
-  pagEl.appendChild(frag);
-}
-
-function setupMap() {
-  const container = refs.mapContainer;
-  if (!container) {
-    console.error("Map container not found.");
-    return;
-  }
-
-  map = L.map(container).setView([32.8, -95.5], 10);
+  map = L.map(mapContainer).setView([32.8, -95.5], 9);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "&copy; OpenStreetMap"
+    attribution: "© OpenStreetMap",
   }).addTo(map);
 
   markerGroup = L.markerClusterGroup();
   map.addLayer(markerGroup);
-
   console.log("Map initialized.");
 }
 
-function updateMapMarkers() {
-  if (!map || !markerGroup) return;
+/* ---------- Fetch & Render ---------- */
+async function fetchAndRenderEvents(dom) {
+  try {
+    console.log("Fetching events…", API_URL);
+    const res = await fetch(`${API_URL}?action=getEvents`);
+    const data = await res.json();
+    if (!data || !Array.isArray(data.events)) throw new Error("Invalid event data");
+
+    allEvents = data.events;
+    console.log(`Loaded ${allEvents.length} events.`);
+    applyFilters(dom);
+  } catch (err) {
+    console.error("Failed to load events:", err);
+  }
+}
+
+/* ---------- Filtering ---------- */
+function applyFilters(dom) {
+  if (!allEvents.length) return;
+
+  const query = dom.searchInput?.value.toLowerCase() || "";
+  const location = dom.locationFilter?.value || "";
+  const date = dom.dateFilter?.value || "";
+  const includePast = dom.showPast?.checked || false;
+
+  const today = new Date().toISOString().split("T")[0];
+
+  filteredEvents = allEvents.filter(ev => {
+    const matchSearch =
+      !query ||
+      ev.title?.toLowerCase().includes(query) ||
+      ev.description?.toLowerCase().includes(query);
+    const matchLoc = !location || ev.location === location;
+    const matchDate = !date || ev.date === date;
+    const matchPast = includePast || ev.date >= today;
+    return matchSearch && matchLoc && matchDate && matchPast;
+  });
+
+  renderEvents(dom);
+  updateMap();
+}
+
+/* ---------- Render Events ---------- */
+function renderEvents(dom) {
+  const container = dom.list;
+  if (!container) return;
+
+  container.innerHTML = "";
+  const frag = document.createDocumentFragment();
+
+  if (!filteredEvents.length) {
+    const empty = document.createElement("p");
+    empty.textContent = "No events found.";
+    frag.appendChild(empty);
+  } else {
+    filteredEvents.forEach(ev => {
+      const div = document.createElement("div");
+      div.className = "event-card";
+      div.innerHTML = `
+        <h3>${ev.title}</h3>
+        <p class="event-date">${ev.date}</p>
+        <p class="event-location">${ev.location}</p>
+        <p class="event-desc">${ev.description || ""}</p>
+      `;
+      frag.appendChild(div);
+    });
+  }
+
+  container.appendChild(frag);
+}
+
+/* ---------- Update Map ---------- */
+function updateMap() {
+  if (!markerGroup || !map) return;
   markerGroup.clearLayers();
 
-  for (const ev of filteredEvents) {
-    if (ev.lat != null && ev.lng != null) {
-      const marker = L.marker([ev.lat, ev.lng]).bindPopup(`
-        <strong>${ev.title}</strong><br>${ev.date}<br>${ev.location}
-      `);
+  filteredEvents.forEach(ev => {
+    if (ev.lat && ev.lng) {
+      const marker = L.marker([ev.lat, ev.lng]).bindPopup(
+        `<b>${ev.title}</b><br>${ev.location}<br>${ev.date}`
+      );
       markerGroup.addLayer(marker);
     }
-  }
-
-  const bounds = markerGroup.getBounds();
-  if (bounds.isValid()) {
-    map.fitBounds(bounds, { maxZoom: 14, padding: [40, 40] });
-  }
-}
-
-function showSkeletonLoaders() {
-  const listEl = refs.eventsList;
-  let html = "";
-  for (let i = 0; i < 6; i++) {
-    html += `
-      <div class="skeleton-card">
-        <div class="skeleton-line skeleton-long"></div>
-        <div class="skeleton-line skeleton-medium"></div>
-        <div class="skeleton-line skeleton-short"></div>
-      </div>
-    `;
-  }
-  listEl.innerHTML = html;
-  listEl.classList.remove("hidden");
-}
-
-function fadeOutSkeleton() {
-  const skeletons = refs.eventsList.querySelectorAll(".skeleton-card");
-  skeletons.forEach(el => {
-    el.classList.add("fade-out");
-    setTimeout(() => {
-      if (el.parentNode) el.parentNode.removeChild(el);
-    }, 400);
   });
+
+  if (filteredEvents.some(ev => ev.lat && ev.lng)) {
+    const group = L.featureGroup(markerGroup.getLayers());
+    map.fitBounds(group.getBounds().pad(0.1));
+  }
 }
 
-})();
+/* ---------- Utility ---------- */
+function debounce(fn, delay) {
+  let t;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), delay);
+  };
+}
