@@ -129,19 +129,15 @@ function renderEvents(container, events) {
         ? `<div class="event-logo"><img src="${ev.logo}" alt="${ev.title} logo"></div>`
         : "";
 
-      return `
-        <div class="event-card">
-          ${logo}
-          <div class="event-info">
-            <h3 class="event-title">${title}</h3>
-            <p class="event-date">
-              ${dateStr}${endStr && endStr !== dateStr ? " – " + endStr : ""}
-            </p>
-            <p class="event-location">${ev.location || ""}</p>
-            <p class="event-description">${ev.description || ""}</p>
-          </div>
-        </div>
-      `;
+     return `
+      <div class="event-card">
+        ${ev.logo ? `<img src="${ev.logo}" alt="Event Logo" class="event-logo" loading="lazy">` : ""}
+        <h3>${ev.link ? `<a href="${ev.link}" target="_blank" rel="noopener">${ev.title}</a>` : ev.title}</h3>
+        <p class="event-date">${dateStr}</p>
+        <p class="event-location">${ev.location || ""}</p>
+        <p class="event-description">${ev.description || ""}</p>
+      </div>
+    `;
     })
     .join("");
 
