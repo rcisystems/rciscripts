@@ -1,10 +1,11 @@
 /* ============================================================
-   Lake Fork Events Frontend v6 (Final Patched)
+   Lake Fork Events Frontend v7 (Final)
    ------------------------------------------------------------
-   - Fixes null container crash
+   - Handles nested event JSON
    - Auto-creates map & list containers
-   - Handles nested {events:{events:[]}}
-   - Defers init to post-hydration
+   - Shows next 5 upcoming events minimum
+   - Robust date parsing & sorting
+   - Resilient to GHL React hydration
    ============================================================ */
 
 console.log("LF-EVENTS JS LOADED");
@@ -17,7 +18,7 @@ let map, markerGroup;
 let allEvents = [];
 let filteredEvents = [];
 
-/* ---------- Safe DOM ready ---------- */
+/* ---------- DOM ready ---------- */
 document.addEventListener("DOMContentLoaded", () => {
   if (!document.getElementById("lf-events-root")) {
     const root = document.createElement("div");
@@ -27,7 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-/* ---------- Defer init until after hydration ---------- */
+/* ---------- Post-hydration init ---------- */
 window.addEventListener("load", () => {
   console.log("Window load fired — scheduling init after hydration.");
   requestAnimationFrame(() => setTimeout(init, 150));
@@ -36,8 +37,6 @@ window.addEventListener("load", () => {
 /* ---------- Init ---------- */
 async function init() {
   console.log("Init starting…");
-
-  // Ensure containers exist even if React wipes DOM
   ensureContainers();
 
   const dom = {
@@ -105,7 +104,6 @@ async function fetchAndRenderEvents(dom) {
     const data = await res.json();
     console.log("Raw API response:", data);
 
-    // Handle nested or flat structures
     let eventsArray = [];
     if (Array.isArray(data.events)) {
       eventsArray = data.events;
@@ -115,9 +113,7 @@ async function fetchAndRenderEvents(dom) {
       eventsArray = data;
     }
 
-    if (!Array.isArray(eventsArray)) {
-      throw new Error("Invalid event data");
-    }
+    if (!Array.isArray(eventsArray)) throw new Error("Invalid event data");
 
     allEvents = eventsArray;
     console.log(`Loaded ${allEvents.length} events.`);
@@ -136,7 +132,7 @@ async function fetchAndRenderEvents(dom) {
   }
 }
 
-/* ---------- Filtering ---------- */
+/* ---------- Filtering & Fallback ---------- */
 function applyFilters(dom) {
   if (!allEvents.length) return;
 
@@ -144,20 +140,62 @@ function applyFilters(dom) {
   const loc = dom.locationFilter?.value || "";
   const date = dom.dateFilter?.value || "";
   const showPast = dom.showPast?.checked || false;
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date();
 
-  filteredEvents = allEvents.filter((ev) => {
-    const title = ev.title?.toLowerCase() || "";
-    const desc = ev.description?.toLowerCase() || "";
-    const matchSearch = !q || title.includes(q) || desc.includes(q);
-    const matchLoc = !loc || ev.location === loc;
-    const matchDate = !date || ev.date === date;
-    const matchPast = showPast || ev.date >= today;
-    return matchSearch && matchLoc && matchDate && matchPast;
-  });
+  filteredEvents = allEvents
+    .filter((ev) => {
+      const title = ev.title?.toLowerCase() || "";
+      const desc = ev.description?.toLowerCase() || "";
+      const evDate = parseEventDate(ev.date);
+
+      const matchSearch = !q || title.includes(q) || desc.includes(q);
+      const matchLoc = !loc || ev.location === loc;
+      const matchDate = !date || sameDay(evDate, new Date(date));
+      const matchPast = showPast || (evDate && evDate >= today);
+
+      return matchSearch && matchLoc && matchDate && matchPast;
+    })
+    .sort((a, b) => parseEventDate(a.date) - parseEventDate(b.date))
+    .slice(0, 5);
+
+  if (!filteredEvents.length) {
+    console.warn("No filtered events, showing next 5 upcoming fallback.");
+    filteredEvents = getNextUpcomingEvents(5);
+  }
 
   renderEvents(dom.eventsList);
   updateMap();
+}
+
+/* ---------- Date Helpers ---------- */
+function parseEventDate(d) {
+  if (!d) return null;
+  const iso = new Date(d);
+  if (!isNaN(iso)) return iso;
+  const m = d.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if (m) return new Date(+m[3], m[1] - 1, +m[2]);
+  return null;
+}
+
+function sameDay(a, b) {
+  return (
+    a &&
+    b &&
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function getNextUpcomingEvents(count) {
+  const today = new Date();
+  return allEvents
+    .filter((ev) => {
+      const evDate = parseEventDate(ev.date);
+      return evDate && evDate >= today;
+    })
+    .sort((a, b) => parseEventDate(a.date) - parseEventDate(b.date))
+    .slice(0, count);
 }
 
 /* ---------- Render ---------- */
@@ -229,18 +267,12 @@ function hideSkeleton(container) {
 }
 
 function renderEmptyState(container) {
-  if (!container) {
-    console.warn("renderEmptyState called with null container");
-    return;
-  }
+  if (!container) return;
   container.innerHTML = `<p class="empty-msg">No events found — check back soon!</p>`;
 }
 
 function renderError(container, msg) {
-  if (!container) {
-    console.warn("renderError called with null container");
-    return;
-  }
+  if (!container) return;
   container.innerHTML = `<p class="error-msg">⚠️ Error loading events: ${msg}</p>`;
 }
 
