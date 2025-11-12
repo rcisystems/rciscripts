@@ -1,11 +1,5 @@
 /* ============================================================
-   Lake Fork Events Front-End (Patched v3)
-   ------------------------------------------------------------
-   Fixes:
-   • Removed undefined templateHTML reference
-   • Delayed init to avoid React hydration mismatches
-   • Added safe root-element creation
-   • Stable map + skeleton loader + debounced search
+   Lake Fork Events Frontend v4 (Patched)
    ============================================================ */
 
 console.log("LF-EVENTS JS LOADED");
@@ -14,27 +8,35 @@ const API_URL =
   window.LAKE_FORK_API_URL ||
   "https://script.google.com/macros/s/AKfycbyMIl5cn8s1NcsNxUoToWEFtYu_JvxGhN9DDkzU9AOfwbZ3rH9qV3sZPgr9vOs6VyEY/exec";
 
-let map, markerGroup, allEvents = [], filteredEvents = [];
+let map, markerGroup;
+let allEvents = [];
+let filteredEvents = [];
 
-/* ---------- DOM Ready Helper ---------- */
+/* -------------------------------
+   Wait for DOM safely
+------------------------------- */
 document.addEventListener("DOMContentLoaded", () => {
-  // Ensure a root container exists (prevents ReferenceError)
-  let root = document.getElementById("lf-events-root");
-  if (!root) {
-    root = document.createElement("div");
+  console.log("Before DOMContentLoaded hook");
+
+  if (!document.getElementById("lf-events-root")) {
+    const root = document.createElement("div");
     root.id = "lf-events-root";
     document.body.appendChild(root);
     console.log("Created #lf-events-root dynamically.");
   }
 });
 
-/* ---------- Delay Init until React hydration finishes ---------- */
+/* -------------------------------
+   Delay init until hydration finishes
+------------------------------- */
 window.addEventListener("load", () => {
-  console.log("Window load fired — scheduling init after hydration.");
-  requestAnimationFrame(() => setTimeout(init, 150));
+  console.log("Window load fired — React hydration finished.");
+  requestAnimationFrame(() => setTimeout(init, 100));
 });
 
-/* ---------- Initialization ---------- */
+/* -------------------------------
+   Init
+------------------------------- */
 async function init() {
   console.log("Init starting…");
 
@@ -42,34 +44,37 @@ async function init() {
     searchInput: document.querySelector("#search"),
     locationFilter: document.querySelector("#locationFilter"),
     dateFilter: document.querySelector("#dateFilter"),
-    timeToggle: document.querySelector("#timeToggle"),
     showPast: document.querySelector("#showPast"),
-    list: document.querySelector("#eventsList"),
+    eventsList: document.querySelector("#eventsList"),
   };
 
   console.log("DOM references assigned:", dom);
 
   initMap();
+  showSkeleton(dom.eventsList);
+
   await fetchAndRenderEvents(dom);
 
-  // Event listeners (debounced)
-  const debouncedFilter = debounce(() => applyFilters(dom), 250);
-  Object.values(dom).forEach(el => {
-    if (el) el.addEventListener("input", debouncedFilter);
+  // Debounced filtering
+  const debounced = debounce(() => applyFilters(dom), 250);
+  Object.values(dom).forEach((el) => {
+    if (el) el.addEventListener("input", debounced);
   });
 }
 
-/* ---------- Map ---------- */
+/* -------------------------------
+   Map
+------------------------------- */
 function initMap() {
-  const mapContainer = document.getElementById("eventsMap");
-  if (!mapContainer) {
-    console.warn("No map container found");
+  const container = document.getElementById("eventsMap");
+  if (!container) {
+    console.warn("No #eventsMap container found.");
     return;
   }
 
-  map = L.map(mapContainer).setView([32.8, -95.5], 9);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "© OpenStreetMap",
+  map = L.map(container).setView([32.8, -95.5], 9);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+    attribution: "© CartoDB © OpenStreetMap",
   }).addTo(map);
 
   markerGroup = L.markerClusterGroup();
@@ -77,98 +82,157 @@ function initMap() {
   console.log("Map initialized.");
 }
 
-/* ---------- Fetch & Render ---------- */
+/* -------------------------------
+   Fetch Events
+------------------------------- */
 async function fetchAndRenderEvents(dom) {
   try {
-    console.log("Fetching events…", API_URL);
+    console.log("Fetching events…");
     const res = await fetch(`${API_URL}?action=getEvents`);
     const data = await res.json();
-    if (!data || !Array.isArray(data.events)) throw new Error("Invalid event data");
+    console.log("Raw response:", data);
 
-    allEvents = data.events;
+    // Handle nested structure
+    const eventsArray = Array.isArray(data.events)
+      ? data.events
+      : Array.isArray(data.events?.events)
+      ? data.events.events
+      : [];
+
+    allEvents = eventsArray;
     console.log(`Loaded ${allEvents.length} events.`);
+
+    hideSkeleton(dom.eventsList);
+
+    if (!allEvents.length) {
+      renderEmptyState(dom.eventsList);
+      return;
+    }
+
     applyFilters(dom);
   } catch (err) {
     console.error("Failed to load events:", err);
+    renderError(dom.eventsList, err.message);
   }
 }
 
-/* ---------- Filtering ---------- */
+/* -------------------------------
+   Filtering
+------------------------------- */
 function applyFilters(dom) {
   if (!allEvents.length) return;
 
-  const query = dom.searchInput?.value.toLowerCase() || "";
-  const location = dom.locationFilter?.value || "";
+  const q = dom.searchInput?.value.toLowerCase() || "";
+  const loc = dom.locationFilter?.value || "";
   const date = dom.dateFilter?.value || "";
-  const includePast = dom.showPast?.checked || false;
+  const showPast = dom.showPast?.checked || false;
 
   const today = new Date().toISOString().split("T")[0];
 
-  filteredEvents = allEvents.filter(ev => {
-    const matchSearch =
-      !query ||
-      ev.title?.toLowerCase().includes(query) ||
-      ev.description?.toLowerCase().includes(query);
-    const matchLoc = !location || ev.location === location;
+  filteredEvents = allEvents.filter((ev) => {
+    const title = ev.title?.toLowerCase() || "";
+    const desc = ev.description?.toLowerCase() || "";
+    const matchSearch = !q || title.includes(q) || desc.includes(q);
+    const matchLoc = !loc || ev.location === loc;
     const matchDate = !date || ev.date === date;
-    const matchPast = includePast || ev.date >= today;
+    const matchPast = showPast || ev.date >= today;
     return matchSearch && matchLoc && matchDate && matchPast;
   });
 
-  renderEvents(dom);
+  renderEvents(dom.eventsList);
   updateMap();
 }
 
-/* ---------- Render Events ---------- */
-function renderEvents(dom) {
-  const container = dom.list;
+/* -------------------------------
+   Render Event Cards
+------------------------------- */
+function renderEvents(container) {
   if (!container) return;
-
   container.innerHTML = "";
+
   const frag = document.createDocumentFragment();
 
   if (!filteredEvents.length) {
-    const empty = document.createElement("p");
-    empty.textContent = "No events found.";
-    frag.appendChild(empty);
-  } else {
-    filteredEvents.forEach(ev => {
-      const div = document.createElement("div");
-      div.className = "event-card";
-      div.innerHTML = `
-        <h3>${ev.title}</h3>
-        <p class="event-date">${ev.date}</p>
-        <p class="event-location">${ev.location}</p>
-        <p class="event-desc">${ev.description || ""}</p>
-      `;
-      frag.appendChild(div);
-    });
+    renderEmptyState(container);
+    return;
+  }
+
+  for (const ev of filteredEvents) {
+    const card = document.createElement("div");
+    card.className = "event-item";
+    card.innerHTML = `
+      <h3>${ev.title}</h3>
+      <p class="event-date">${ev.date}</p>
+      <p class="event-location">${ev.location}</p>
+      <p class="event-desc">${ev.description || ""}</p>
+    `;
+    frag.appendChild(card);
   }
 
   container.appendChild(frag);
 }
 
-/* ---------- Update Map ---------- */
+/* -------------------------------
+   Map Update
+------------------------------- */
 function updateMap() {
-  if (!markerGroup || !map) return;
+  if (!map || !markerGroup) return;
   markerGroup.clearLayers();
 
-  filteredEvents.forEach(ev => {
+  const points = [];
+
+  filteredEvents.forEach((ev) => {
     if (ev.lat && ev.lng) {
-      const marker = L.marker([ev.lat, ev.lng]).bindPopup(
-        `<b>${ev.title}</b><br>${ev.location}<br>${ev.date}`
+      const marker = L.marker([ev.lat, ev.lng], { className: "drop" }).bindPopup(
+        `<strong>${ev.title}</strong><br>${ev.location}<br>${ev.date}`
       );
       markerGroup.addLayer(marker);
+      points.push([ev.lat, ev.lng]);
     }
   });
 
-  if (filteredEvents.some(ev => ev.lat && ev.lng)) {
+  if (points.length) {
     const group = L.featureGroup(markerGroup.getLayers());
     map.fitBounds(group.getBounds().pad(0.1));
   }
 }
 
-/* ---------- Utility ---------- */
+/* -------------------------------
+   Skeleton + States
+------------------------------- */
+function showSkeleton(container) {
+  if (!container) return;
+  container.innerHTML = "";
+  for (let i = 0; i < 3; i++) {
+    const card = document.createElement("div");
+    card.className = "skeleton-card";
+    card.innerHTML = `
+      <div class="skeleton-line skeleton-long"></div>
+      <div class="skeleton-line skeleton-medium"></div>
+      <div class="skeleton-line skeleton-short"></div>
+    `;
+    container.appendChild(card);
+  }
+}
+
+function hideSkeleton(container) {
+  const skels = container?.querySelectorAll(".skeleton-card");
+  if (skels?.length) {
+    skels.forEach((el) => (el.style.display = "none"));
+  }
+}
+
+function renderEmptyState(container) {
+  container.innerHTML = `<p class="empty-msg">No events yet — check back soon!</p>`;
+}
+
+function renderError(container, msg) {
+  container.innerHTML = `<p class="error-msg">⚠️ Error loading events: ${msg}</p>`;
+}
+
+/* -------------------------------
+   Utils
+------------------------------- */
 function debounce(fn, delay) {
   let t;
   return (...args) => {
