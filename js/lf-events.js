@@ -3,9 +3,6 @@
 // =======================================================
 console.log("LF-EVENTS JS LOADED");
 
-const container = document.getElementById("lf-events-root");
-if (container) container.innerHTML = templateHTML;
-
 (function () {
   const API_URL = window.LAKE_FORK_API_URL ||
     "https://script.google.com/macros/s/AKfycbyMIl5cn8s1NcsNxUoToWEFtYu_JvxGhN9DDkzU9AOfwbZ3rH9qV3sZPgr9vOs6VyEY/exec";
@@ -53,6 +50,8 @@ if (container) container.innerHTML = templateHTML;
   });
 });
 
+const container = document.getElementById("lf-events-root");
+if (container) container.innerHTML = templateHTML;
 
 async function init() {
   console.log("Init starting…");
