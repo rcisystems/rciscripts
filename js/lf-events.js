@@ -1,5 +1,10 @@
 /* ============================================================
-   Lake Fork Events Frontend v4 (Patched)
+   Lake Fork Events Frontend v5 (Final)
+   ------------------------------------------------------------
+   Fixes:
+   - Handles nested {events: {events: []}} structure
+   - Added detailed logging + graceful fallback
+   - Keeps stable map + filters
    ============================================================ */
 
 console.log("LF-EVENTS JS LOADED");
@@ -12,12 +17,8 @@ let map, markerGroup;
 let allEvents = [];
 let filteredEvents = [];
 
-/* -------------------------------
-   Wait for DOM safely
-------------------------------- */
+/* ---------- Safe DOM ready ---------- */
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("Before DOMContentLoaded hook");
-
   if (!document.getElementById("lf-events-root")) {
     const root = document.createElement("div");
     root.id = "lf-events-root";
@@ -26,17 +27,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-/* -------------------------------
-   Delay init until hydration finishes
-------------------------------- */
+/* ---------- Defer init until after hydration ---------- */
 window.addEventListener("load", () => {
-  console.log("Window load fired — React hydration finished.");
-  requestAnimationFrame(() => setTimeout(init, 100));
+  console.log("Window load fired — scheduling init after hydration.");
+  requestAnimationFrame(() => setTimeout(init, 120));
 });
 
-/* -------------------------------
-   Init
-------------------------------- */
+/* ---------- Init ---------- */
 async function init() {
   console.log("Init starting…");
 
@@ -44,27 +41,24 @@ async function init() {
     searchInput: document.querySelector("#search"),
     locationFilter: document.querySelector("#locationFilter"),
     dateFilter: document.querySelector("#dateFilter"),
+    timeToggle: document.querySelector("#timeToggle"),
     showPast: document.querySelector("#showPast"),
     eventsList: document.querySelector("#eventsList"),
   };
-
   console.log("DOM references assigned:", dom);
 
   initMap();
   showSkeleton(dom.eventsList);
-
   await fetchAndRenderEvents(dom);
 
-  // Debounced filtering
+  // Debounced filter
   const debounced = debounce(() => applyFilters(dom), 250);
   Object.values(dom).forEach((el) => {
     if (el) el.addEventListener("input", debounced);
   });
 }
 
-/* -------------------------------
-   Map
-------------------------------- */
+/* ---------- Map ---------- */
 function initMap() {
   const container = document.getElementById("eventsMap");
   if (!container) {
@@ -82,28 +76,32 @@ function initMap() {
   console.log("Map initialized.");
 }
 
-/* -------------------------------
-   Fetch Events
-------------------------------- */
+/* ---------- Fetch & Render ---------- */
 async function fetchAndRenderEvents(dom) {
   try {
-    console.log("Fetching events…");
+    console.log("Fetching events…", API_URL);
     const res = await fetch(`${API_URL}?action=getEvents`);
     const data = await res.json();
-    console.log("Raw response:", data);
+    console.log("Raw API response:", data);
 
-    // Handle nested structure
-    const eventsArray = Array.isArray(data.events)
-      ? data.events
-      : Array.isArray(data.events?.events)
-      ? data.events.events
-      : [];
+    // Handle nested or flat array structures
+    let eventsArray = [];
+    if (Array.isArray(data.events)) {
+      eventsArray = data.events;
+    } else if (Array.isArray(data.events?.events)) {
+      eventsArray = data.events.events;
+    } else if (Array.isArray(data)) {
+      eventsArray = data;
+    }
+
+    if (!Array.isArray(eventsArray)) {
+      throw new Error("Invalid event data structure");
+    }
 
     allEvents = eventsArray;
     console.log(`Loaded ${allEvents.length} events.`);
 
     hideSkeleton(dom.eventsList);
-
     if (!allEvents.length) {
       renderEmptyState(dom.eventsList);
       return;
@@ -116,9 +114,7 @@ async function fetchAndRenderEvents(dom) {
   }
 }
 
-/* -------------------------------
-   Filtering
-------------------------------- */
+/* ---------- Filtering ---------- */
 function applyFilters(dom) {
   if (!allEvents.length) return;
 
@@ -126,7 +122,6 @@ function applyFilters(dom) {
   const loc = dom.locationFilter?.value || "";
   const date = dom.dateFilter?.value || "";
   const showPast = dom.showPast?.checked || false;
-
   const today = new Date().toISOString().split("T")[0];
 
   filteredEvents = allEvents.filter((ev) => {
@@ -143,20 +138,17 @@ function applyFilters(dom) {
   updateMap();
 }
 
-/* -------------------------------
-   Render Event Cards
-------------------------------- */
+/* ---------- Render ---------- */
 function renderEvents(container) {
   if (!container) return;
   container.innerHTML = "";
-
-  const frag = document.createDocumentFragment();
 
   if (!filteredEvents.length) {
     renderEmptyState(container);
     return;
   }
 
+  const frag = document.createDocumentFragment();
   for (const ev of filteredEvents) {
     const card = document.createElement("div");
     card.className = "event-item";
@@ -172,24 +164,21 @@ function renderEvents(container) {
   container.appendChild(frag);
 }
 
-/* -------------------------------
-   Map Update
-------------------------------- */
+/* ---------- Map Update ---------- */
 function updateMap() {
   if (!map || !markerGroup) return;
   markerGroup.clearLayers();
 
   const points = [];
-
-  filteredEvents.forEach((ev) => {
+  for (const ev of filteredEvents) {
     if (ev.lat && ev.lng) {
-      const marker = L.marker([ev.lat, ev.lng], { className: "drop" }).bindPopup(
-        `<strong>${ev.title}</strong><br>${ev.location}<br>${ev.date}`
+      const marker = L.marker([ev.lat, ev.lng]).bindPopup(
+        `<b>${ev.title}</b><br>${ev.location}<br>${ev.date}`
       );
       markerGroup.addLayer(marker);
       points.push([ev.lat, ev.lng]);
     }
-  });
+  }
 
   if (points.length) {
     const group = L.featureGroup(markerGroup.getLayers());
@@ -197,42 +186,35 @@ function updateMap() {
   }
 }
 
-/* -------------------------------
-   Skeleton + States
-------------------------------- */
+/* ---------- Skeleton + States ---------- */
 function showSkeleton(container) {
   if (!container) return;
   container.innerHTML = "";
   for (let i = 0; i < 3; i++) {
-    const card = document.createElement("div");
-    card.className = "skeleton-card";
-    card.innerHTML = `
+    const c = document.createElement("div");
+    c.className = "skeleton-card";
+    c.innerHTML = `
       <div class="skeleton-line skeleton-long"></div>
       <div class="skeleton-line skeleton-medium"></div>
       <div class="skeleton-line skeleton-short"></div>
     `;
-    container.appendChild(card);
+    container.appendChild(c);
   }
 }
 
 function hideSkeleton(container) {
-  const skels = container?.querySelectorAll(".skeleton-card");
-  if (skels?.length) {
-    skels.forEach((el) => (el.style.display = "none"));
-  }
+  container?.querySelectorAll(".skeleton-card")?.forEach((el) => el.remove());
 }
 
 function renderEmptyState(container) {
-  container.innerHTML = `<p class="empty-msg">No events yet — check back soon!</p>`;
+  container.innerHTML = `<p class="empty-msg">No events found — check back soon!</p>`;
 }
 
 function renderError(container, msg) {
   container.innerHTML = `<p class="error-msg">⚠️ Error loading events: ${msg}</p>`;
 }
 
-/* -------------------------------
-   Utils
-------------------------------- */
+/* ---------- Utils ---------- */
 function debounce(fn, delay) {
   let t;
   return (...args) => {
