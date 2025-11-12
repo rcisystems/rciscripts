@@ -1,8 +1,18 @@
 /* ==========================
-   Lake Fork Events Script
+   Lake Fork Events (Force Init)
    ========================== */
-
 console.log("LF-EVENTS JS LOADED");
+
+// Fire immediately if DOM is ready, otherwise on load
+if (document.readyState === "complete" || document.readyState === "interactive") {
+  console.log("DOM ready — starting init immediately.");
+  setTimeout(init, 200);
+} else {
+  window.addEventListener("load", () => {
+    console.log("Window load fired — initializing after hydration...");
+    setTimeout(init, 200);
+  });
+}
 
 window.addEventListener("load", () => {
   console.log("Window load fired — initializing...");
