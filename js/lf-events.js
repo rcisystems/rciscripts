@@ -5,7 +5,7 @@ console.log("LF-EVENTS JS LOADED");
 
 (function () {
   const API_URL = window.LAKE_FORK_API_URL ||
-    "https://script.google.com/macros/s/AKfycbxiOi_KwTuf30pvE6vy4J6hWN1AUKNpxYpyQOkHymjCD7RlxVC4MFxtTe4bos8jVeyQ/exec";
+    "https://script.google.com/macros/s/AKfycbyMIl5cn8s1NcsNxUoToWEFtYu_JvxGhN9DDkzU9AOfwbZ3rH9qV3sZPgr9vOs6VyEY/exec";
 
   const refs = {
     searchInput: null,
@@ -42,11 +42,12 @@ console.log("LF-EVENTS JS LOADED");
 
   // INITIALIZATION: after load and after hydration safe delay
   window.addEventListener("load", () => {
-    console.log("Window load fired — initialization starts after frame.");
-    requestAnimationFrame(() => {
-      setTimeout(init, 50);
-    });
+  console.log("Window load fired — initialization starts after frame.");
+  requestAnimationFrame(() => {
+    // one extra frame so React finishes hydration
+    requestAnimationFrame(init);
   });
+});
 
   async function init() {
     console.log("Init starting…");
