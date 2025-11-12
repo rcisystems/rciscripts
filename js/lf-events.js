@@ -1,6 +1,6 @@
-/* ================================
-   Lake Fork Events — Final Build
-   ================================ */
+/* ===============================
+   Lake Fork Events – FINAL PATCH
+   =============================== */
 
 console.log("LF-EVENTS JS LOADED");
 
@@ -11,10 +11,9 @@ let allEvents = [];
 let filteredEvents = [];
 let map;
 
-// ---- ENTRYPOINT ----
-window.addEventListener("load", async () => {
+window.addEventListener("load", () => {
   console.log("Window load fired — initializing...");
-  await init();
+  init();
 });
 
 async function init() {
@@ -36,7 +35,6 @@ async function init() {
   initMap(refs.map);
   await fetchEvents(refs.root);
 
-  // Setup filters
   refs.search?.addEventListener("input", () => applyFilters(refs));
   refs.location?.addEventListener("change", () => applyFilters(refs));
   refs.showPast?.addEventListener("change", () => applyFilters(refs));
@@ -61,16 +59,16 @@ async function fetchEvents(container) {
     const data = await res.json();
     console.log("Raw API response:", data);
 
-    const events = data?.events?.allEvents || [];
-    allEvents = events;
+    const events = data?.events?.allEvents || data?.events || [];
+    allEvents = Array.isArray(events) ? events : [];
 
-    if (!events.length) {
+    if (!allEvents.length) {
       renderEmptyState(container);
       return;
     }
 
-    populateLocationFilter(events);
-    filteredEvents = filterAndSearchEvents(events);
+    populateLocationFilter(allEvents);
+    filteredEvents = filterAndSearchEvents(allEvents);
     renderEvents(container, filteredEvents);
   } catch (err) {
     console.error("Failed to load events:", err);
@@ -118,10 +116,15 @@ function populateLocationFilter(events) {
     locations.map(loc => `<option value="${loc}">${loc}</option>`).join("");
 }
 
-// ---- RENDERERS ----
+// ---- RENDER ----
 function renderEvents(container, events) {
   if (!container) return;
-  if (!events || !events.length) return renderEmptyState(container);
+  container.innerHTML = "";
+
+  if (!events || !events.length) {
+    renderEmptyState(container);
+    return;
+  }
 
   const html = events
     .map(ev => {
@@ -149,46 +152,31 @@ function renderEvents(container, events) {
 
   container.innerHTML = html;
 
-  if (map) {
-    map.eachLayer(layer => {
-      if (layer instanceof L.Marker) map.removeLayer(layer);
-    });
+  if (!map) return;
 
-    const markers = [];
-    events.forEach(ev => {
-      if (ev.lat && ev.lng) {
-        const marker = L.marker([ev.lat, ev.lng])
-          .addTo(map)
-          .bindPopup(`<b>${ev.title}</b><br>${ev.location || ""}`);
-        markers.push(marker);
-      }
-    });
+  map.eachLayer(layer => {
+    if (layer instanceof L.Marker) map.removeLayer(layer);
+  });
 
-    if (markers.length) {
-      const group = new L.featureGroup(markers);
-      map.fitBounds(group.getBounds(), { padding: [30, 30] });
+  const markers = [];
+  events.forEach(ev => {
+    if (ev.lat && ev.lng) {
+      const marker = L.marker([ev.lat, ev.lng])
+        .addTo(map)
+        .bindPopup(`<b>${ev.title}</b><br>${ev.location || ""}`);
+      markers.push(marker);
     }
+  });
 
-    const cards = container.querySelectorAll(".event-card");
-    cards.forEach(card => {
-      const lat = parseFloat(card.dataset.lat);
-      const lng = parseFloat(card.dataset.lng);
-      if (!isNaN(lat) && !isNaN(lng)) {
-        card.addEventListener("mouseenter", () => {
-          const marker = markers.find(m => {
-            const pos = m.getLatLng();
-            return pos.lat === lat && pos.lng === lng;
-          });
-          if (marker) marker.openPopup();
-        });
-        card.addEventListener("mouseleave", () => map.closePopup());
-      }
-    });
+  if (markers.length) {
+    const group = new L.featureGroup(markers);
+    map.fitBounds(group.getBounds(), { padding: [30, 30] });
   }
 
   console.log(`Rendered ${events.length} events.`);
 }
 
+// ---- STATES ----
 function renderEmptyState(container) {
   container.innerHTML = `<div class="empty-state">No matching events found.</div>`;
 }
