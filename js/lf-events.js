@@ -40,14 +40,13 @@ console.log("LF-EVENTS JS LOADED");
     return new Promise(resolve => requestAnimationFrame(resolve));
   }
 
-  // INITIALIZATION: after load and after hydration safe delay
+  // Initialization after hydration-safe delay
   window.addEventListener("load", () => {
-  console.log("Window load fired — scheduling init after double frame delay.");
-  requestAnimationFrame(() => {
-    requestAnimationFrame(init);   // two-frame delay lets React finish diff
+    console.log("Window load fired — scheduling init after double frame delay.");
+    requestAnimationFrame(() => {
+      requestAnimationFrame(init); // double delay prevents hydration mismatch
+    });
   });
-});
-
 
   async function init() {
     console.log("Init starting…");
@@ -56,16 +55,14 @@ console.log("LF-EVENTS JS LOADED");
     showSkeletonLoaders();
     setupEventListeners();
 
-    // Setup map early – but don’t block initial paint
+    // Setup map early – non-blocking
     setupMap();
 
-    // Fetch events in background
+    // Fetch events asynchronously
     const fetchPromise = fetchEvents();
-    // yield one frame so skeleton appears
-    await nextFrame();
+    await nextFrame(); // yield to paint skeleton
     await fetchPromise;
 
-    // After events loaded
     fadeOutSkeleton();
     refs.mapSpinner.classList.add("fade-out");
     setTimeout(() => refs.mapSpinner.remove(), 400);
@@ -94,7 +91,13 @@ console.log("LF-EVENTS JS LOADED");
       const json = await response.json();
       if (!json.success) throw new Error(json.error || "Unknown error");
 
-      allEvents = json.events || [];
+      let allData = json.events || [];
+      // Normalize in case Apps Script returns object instead of array
+      if (!Array.isArray(allData)) {
+        allData = Object.values(allData || {});
+      }
+      allEvents = allData;
+
       populateLocationFilter();
       applyFilters();
     } catch (err) {
@@ -105,7 +108,7 @@ console.log("LF-EVENTS JS LOADED");
 
   function setupEventListeners() {
     const commonHandler = debounce(() => {
-      currentPage = 1;         // reset to first page on filter change
+      currentPage = 1;
       applyFilters();
     }, 250);
 
@@ -120,38 +123,24 @@ console.log("LF-EVENTS JS LOADED");
     const term       = (refs.searchInput.value || "").toLowerCase();
     const loc        = refs.locationFilter.value;
     const date       = refs.dateFilter.value;
-    const mode       = refs.timeToggle.value;   // "upcoming" or "past"
+    const mode       = refs.timeToggle.value;
     const includePast = refs.showPast.checked;
-
     const today      = new Date().toISOString().split("T")[0];
 
     filteredEvents = allEvents.filter(ev => {
-      if (term && !(`${ev.title} ${ev.description}`.toLowerCase().includes(term))) {
-        return false;
-      }
-      if (loc && ev.location !== loc) {
-        return false;
-      }
-      if (date && ev.date !== date) {
-        return false;
-      }
-      if (!includePast && ev.date < today) {
-        return false;
-      }
-      if (mode === "upcoming" && ev.date < today) {
-        return false;
-      }
-      if (mode === "past" && ev.date >= today) {
-        return false;
-      }
+      if (!ev) return false;
+      if (term && !(`${ev.title} ${ev.description}`.toLowerCase().includes(term))) return false;
+      if (loc && ev.location !== loc) return false;
+      if (date && ev.date !== date) return false;
+      if (!includePast && ev.date < today) return false;
+      if (mode === "upcoming" && ev.date < today) return false;
+      if (mode === "past" && ev.date >= today) return false;
       return true;
     });
 
-    // Sort chronologically
     filteredEvents.sort((a, b) => a.date.localeCompare(b.date));
 
     renderEvents();
-    // Use idle callback for map update to avoid blocking main thread
     if (window.requestIdleCallback) {
       requestIdleCallback(updateMapMarkers, { timeout: 500 });
     } else {
@@ -171,10 +160,9 @@ console.log("LF-EVENTS JS LOADED");
     const startIdx  = (currentPage - 1) * EVENTS_PER_PAGE;
     const pageSlice = filteredEvents.slice(startIdx, startIdx + EVENTS_PER_PAGE);
 
-    // Clear and render
     if (pageSlice.length === 0) {
-      listEl.innerHTML   = "<p>No events found.</p>";
-      pagEl.innerHTML    = "";
+      listEl.innerHTML = "<p>No events found.</p>";
+      pagEl.innerHTML = "";
       return;
     }
 
@@ -191,21 +179,16 @@ console.log("LF-EVENTS JS LOADED");
       frag.appendChild(item);
     }
 
-    // Replace children in one operation
     listEl.innerHTML = "";
     listEl.appendChild(frag);
-
     updatePagination();
   }
 
   function updatePagination() {
     const totalPages = Math.ceil(filteredEvents.length / EVENTS_PER_PAGE);
-    const pagEl      = refs.pagination;
-    pagEl.innerHTML  = "";
-
-    if (totalPages <= 1) {
-      return;
-    }
+    const pagEl = refs.pagination;
+    pagEl.innerHTML = "";
+    if (totalPages <= 1) return;
 
     const frag = document.createDocumentFragment();
     for (let p = 1; p <= totalPages; p++) {
@@ -230,7 +213,6 @@ console.log("LF-EVENTS JS LOADED");
       return;
     }
 
-    // Lazy-initialize map on first view if desired
     map = L.map(container).setView([32.8, -95.5], 10);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "&copy; OpenStreetMap"
@@ -244,24 +226,20 @@ console.log("LF-EVENTS JS LOADED");
 
   function updateMapMarkers() {
     if (!map || !markerGroup) return;
-
     markerGroup.clearLayers();
 
     for (const ev of filteredEvents) {
       if (ev.lat != null && ev.lng != null) {
         const marker = L.marker([ev.lat, ev.lng]).bindPopup(`
-          <strong>${ev.title}</strong><br>
-          ${ev.date}<br>
-          ${ev.location}
+          <strong>${ev.title}</strong><br>${ev.date}<br>${ev.location}
         `);
         markerGroup.addLayer(marker);
       }
     }
 
-    // Optionally: adjust map bounds to current markers
-    const layerBounds = markerGroup.getBounds();
-    if (layerBounds.isValid()) {
-      map.fitBounds(layerBounds, { maxZoom: 14, padding: [40, 40] });
+    const bounds = markerGroup.getBounds();
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { maxZoom: 14, padding: [40, 40] });
     }
   }
 
