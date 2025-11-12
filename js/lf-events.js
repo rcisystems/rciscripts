@@ -1,13 +1,6 @@
 /* ============================================================
-   Lake Fork Events Frontend v7 (Final)
-   ------------------------------------------------------------
-   - Handles nested event JSON
-   - Auto-creates map & list containers
-   - Shows next 5 upcoming events minimum
-   - Robust date parsing & sorting
-   - Resilient to GHL React hydration
+   Lake Fork Events Frontend – resilient final build
    ============================================================ */
-
 console.log("LF-EVENTS JS LOADED");
 
 const API_URL =
@@ -18,23 +11,12 @@ let map, markerGroup;
 let allEvents = [];
 let filteredEvents = [];
 
-/* ---------- DOM ready ---------- */
-document.addEventListener("DOMContentLoaded", () => {
-  if (!document.getElementById("lf-events-root")) {
-    const root = document.createElement("div");
-    root.id = "lf-events-root";
-    document.body.appendChild(root);
-    console.log("Created #lf-events-root dynamically.");
-  }
-});
-
-/* ---------- Post-hydration init ---------- */
+/* ---------- Startup ---------- */
 window.addEventListener("load", () => {
   console.log("Window load fired — scheduling init after hydration.");
   requestAnimationFrame(() => setTimeout(init, 150));
 });
 
-/* ---------- Init ---------- */
 async function init() {
   console.log("Init starting…");
   ensureContainers();
@@ -43,7 +25,6 @@ async function init() {
     searchInput: document.querySelector("#search"),
     locationFilter: document.querySelector("#locationFilter"),
     dateFilter: document.querySelector("#dateFilter"),
-    timeToggle: document.querySelector("#timeToggle"),
     showPast: document.querySelector("#showPast"),
     eventsList: document.querySelector("#eventsList"),
   };
@@ -53,50 +34,40 @@ async function init() {
   showSkeleton(dom.eventsList);
   await fetchAndRenderEvents(dom);
 
-  const debounced = debounce(() => applyFilters(dom), 250);
-  Object.values(dom).forEach((el) => {
-    if (el) el.addEventListener("input", debounced);
-  });
+  const debounced = debounce(() => applyFilters(dom), 300);
+  Object.values(dom).forEach((el) => el && el.addEventListener("input", debounced));
 }
 
-/* ---------- Ensure Containers ---------- */
+/* ---------- Containers ---------- */
 function ensureContainers() {
   if (!document.querySelector("#eventsList")) {
-    const listDiv = document.createElement("div");
-    listDiv.id = "eventsList";
-    listDiv.className = "events-list";
-    document.body.appendChild(listDiv);
-    console.warn("Auto-created #eventsList container.");
+    const div = document.createElement("div");
+    div.id = "eventsList";
+    div.className = "events-list";
+    document.body.appendChild(div);
   }
-
   if (!document.querySelector("#eventsMap")) {
-    const mapDiv = document.createElement("div");
-    mapDiv.id = "eventsMap";
-    mapDiv.className = "events-map";
-    document.body.appendChild(mapDiv);
-    console.warn("Auto-created #eventsMap container.");
+    const div = document.createElement("div");
+    div.id = "eventsMap";
+    div.className = "events-map";
+    document.body.appendChild(div);
   }
 }
 
 /* ---------- Map ---------- */
 function initMap() {
-  const container = document.getElementById("eventsMap");
-  if (!container) {
-    console.warn("No #eventsMap container found.");
-    return;
-  }
-
-  map = L.map(container).setView([32.8, -95.5], 9);
+  const el = document.getElementById("eventsMap");
+  if (!el) return console.warn("Missing #eventsMap");
+  map = L.map(el).setView([32.8, -95.5], 9);
   L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
     attribution: "© CartoDB © OpenStreetMap",
   }).addTo(map);
-
   markerGroup = L.markerClusterGroup();
   map.addLayer(markerGroup);
   console.log("Map initialized.");
 }
 
-/* ---------- Fetch & Render ---------- */
+/* ---------- Fetch ---------- */
 async function fetchAndRenderEvents(dom) {
   try {
     console.log("Fetching events…", API_URL);
@@ -104,35 +75,37 @@ async function fetchAndRenderEvents(dom) {
     const data = await res.json();
     console.log("Raw API response:", data);
 
-    let eventsArray = [];
-    if (Array.isArray(data.events)) {
-      eventsArray = data.events;
-    } else if (Array.isArray(data.events?.events)) {
-      eventsArray = data.events.events;
-    } else if (Array.isArray(data)) {
-      eventsArray = data;
-    }
+    // normalize possible shapes
+    let arr = [];
+    if (Array.isArray(data)) arr = data;
+    else if (Array.isArray(data.events)) arr = data.events;
+    else if (Array.isArray(data.events?.events)) arr = data.events.events;
 
-    if (!Array.isArray(eventsArray)) throw new Error("Invalid event data");
-
-    allEvents = eventsArray;
-    console.log(`Loaded ${allEvents.length} events.`);
+    allEvents = arr.map((e) => ({
+      title: e.title || e.name || "Untitled Event",
+      date: e.date || e.startDate || "",
+      location: e.location || e.place || "Lake Fork Area",
+      description: e.description || "",
+      lat: +e.lat || null,
+      lng: +e.lng || null,
+    }));
 
     hideSkeleton(dom.eventsList);
 
     if (!allEvents.length) {
+      console.warn("⚠️ No events returned from API — showing placeholder.");
       renderEmptyState(dom.eventsList);
       return;
     }
 
     applyFilters(dom);
   } catch (err) {
-    console.error("Failed to load events:", err);
+    console.error("Fetch failed:", err);
     renderError(dom.eventsList, err.message);
   }
 }
 
-/* ---------- Filtering & Fallback ---------- */
+/* ---------- Filters ---------- */
 function applyFilters(dom) {
   if (!allEvents.length) return;
 
@@ -144,37 +117,41 @@ function applyFilters(dom) {
 
   filteredEvents = allEvents
     .filter((ev) => {
-      const title = ev.title?.toLowerCase() || "";
-      const desc = ev.description?.toLowerCase() || "";
       const evDate = parseEventDate(ev.date);
-
-      const matchSearch = !q || title.includes(q) || desc.includes(q);
+      if (!evDate) return false;
+      const matchPast = showPast || evDate >= today;
+      const matchSearch =
+        !q ||
+        ev.title.toLowerCase().includes(q) ||
+        ev.description.toLowerCase().includes(q);
       const matchLoc = !loc || ev.location === loc;
       const matchDate = !date || sameDay(evDate, new Date(date));
-      const matchPast = showPast || (evDate && evDate >= today);
-
       return matchSearch && matchLoc && matchDate && matchPast;
     })
-    .sort((a, b) => parseEventDate(a.date) - parseEventDate(b.date))
-    .slice(0, 5);
+    .sort((a, b) => parseEventDate(a.date) - parseEventDate(b.date));
 
+  // fallback: always show next 5 upcoming events
   if (!filteredEvents.length) {
-    console.warn("No filtered events, showing next 5 upcoming fallback.");
     filteredEvents = getNextUpcomingEvents(5);
+  } else {
+    filteredEvents = filteredEvents.slice(0, 5);
   }
 
   renderEvents(dom.eventsList);
   updateMap();
 }
 
-/* ---------- Date Helpers ---------- */
+/* ---------- Helpers ---------- */
 function parseEventDate(d) {
   if (!d) return null;
-  const iso = new Date(d);
-  if (!isNaN(iso)) return iso;
+  let dt = new Date(d);
+  if (!isNaN(dt)) return dt;
+  // try US-style MM/DD/YYYY
   const m = d.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
-  if (m) return new Date(+m[3], m[1] - 1, +m[2]);
-  return null;
+  if (m) return new Date(+m[3], +m[1] - 1, +m[2]);
+  // try "Dec 15 2025"
+  const alt = Date.parse(d);
+  return isNaN(alt) ? null : new Date(alt);
 }
 
 function sameDay(a, b) {
@@ -187,40 +164,37 @@ function sameDay(a, b) {
   );
 }
 
-function getNextUpcomingEvents(count) {
+function getNextUpcomingEvents(n) {
   const today = new Date();
   return allEvents
     .filter((ev) => {
-      const evDate = parseEventDate(ev.date);
-      return evDate && evDate >= today;
+      const dt = parseEventDate(ev.date);
+      return dt && dt >= today;
     })
     .sort((a, b) => parseEventDate(a.date) - parseEventDate(b.date))
-    .slice(0, count);
+    .slice(0, n);
 }
 
 /* ---------- Render ---------- */
 function renderEvents(container) {
   if (!container) return;
   container.innerHTML = "";
-
   if (!filteredEvents.length) {
     renderEmptyState(container);
     return;
   }
-
   const frag = document.createDocumentFragment();
-  for (const ev of filteredEvents) {
+  filteredEvents.forEach((ev) => {
     const card = document.createElement("div");
     card.className = "event-item";
     card.innerHTML = `
       <h3>${ev.title}</h3>
       <p class="event-date">${ev.date}</p>
       <p class="event-location">${ev.location}</p>
-      <p class="event-desc">${ev.description || ""}</p>
+      <p class="event-desc">${ev.description}</p>
     `;
     frag.appendChild(card);
-  }
-
+  });
   container.appendChild(frag);
 }
 
@@ -228,59 +202,46 @@ function renderEvents(container) {
 function updateMap() {
   if (!map || !markerGroup) return;
   markerGroup.clearLayers();
-
-  const points = [];
-  for (const ev of filteredEvents) {
+  const pts = [];
+  filteredEvents.forEach((ev) => {
     if (ev.lat && ev.lng) {
-      const marker = L.marker([ev.lat, ev.lng]).bindPopup(
+      const m = L.marker([ev.lat, ev.lng]).bindPopup(
         `<b>${ev.title}</b><br>${ev.location}<br>${ev.date}`
       );
-      markerGroup.addLayer(marker);
-      points.push([ev.lat, ev.lng]);
+      markerGroup.addLayer(m);
+      pts.push([ev.lat, ev.lng]);
     }
-  }
-
-  if (points.length) {
-    const group = L.featureGroup(markerGroup.getLayers());
-    map.fitBounds(group.getBounds().pad(0.1));
-  }
+  });
+  if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.2));
 }
 
-/* ---------- Skeleton + States ---------- */
-function showSkeleton(container) {
-  if (!container) return;
-  container.innerHTML = "";
+/* ---------- States ---------- */
+function showSkeleton(c) {
+  if (!c) return;
+  c.innerHTML = "";
   for (let i = 0; i < 3; i++) {
-    const c = document.createElement("div");
-    c.className = "skeleton-card";
-    c.innerHTML = `
-      <div class="skeleton-line skeleton-long"></div>
-      <div class="skeleton-line skeleton-medium"></div>
-      <div class="skeleton-line skeleton-short"></div>
-    `;
-    container.appendChild(c);
+    const s = document.createElement("div");
+    s.className = "skeleton-card";
+    s.innerHTML =
+      '<div class="skeleton-line skeleton-long"></div><div class="skeleton-line skeleton-medium"></div><div class="skeleton-line skeleton-short"></div>';
+    c.appendChild(s);
   }
 }
-
-function hideSkeleton(container) {
-  container?.querySelectorAll(".skeleton-card")?.forEach((el) => el.remove());
+function hideSkeleton(c) {
+  c?.querySelectorAll(".skeleton-card").forEach((el) => el.remove());
 }
-
-function renderEmptyState(container) {
-  if (!container) return;
-  container.innerHTML = `<p class="empty-msg">No events found — check back soon!</p>`;
+function renderEmptyState(c) {
+  if (!c) return;
+  c.innerHTML = `<p class="empty-msg">No upcoming events — check back soon!</p>`;
 }
-
-function renderError(container, msg) {
-  if (!container) return;
-  container.innerHTML = `<p class="error-msg">⚠️ Error loading events: ${msg}</p>`;
+function renderError(c, msg) {
+  if (!c) return;
+  c.innerHTML = `<p class="error-msg">⚠️ Error loading events: ${msg}</p>`;
 }
-
-/* ---------- Utils ---------- */
-function debounce(fn, delay) {
+function debounce(fn, d) {
   let t;
-  return (...args) => {
+  return (...a) => {
     clearTimeout(t);
-    t = setTimeout(() => fn(...args), delay);
+    t = setTimeout(() => fn(...a), d);
   };
 }
