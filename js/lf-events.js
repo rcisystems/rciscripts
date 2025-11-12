@@ -1,16 +1,12 @@
 // ======================================================
-// Lake Fork Events — Stable + Diagnostic Build
+// Lake Fork Events — Diagnostic & Stable Build
 // ======================================================
 
 console.log("LF-EVENTS JS LOADED");
 
 // ---- GLOBAL CONFIG ----
-const BASE_API_URL =
+const EVENTS_API_URL =
   "https://script.google.com/macros/s/AKfycbx6D4Z-P-fN66SbRH0H8p_aQXL22cSIBslJEGk9-49OvNJanrJjXi3MMH_x_4PBuX1h/exec";
-const EVENTS_API_URL = BASE_API_URL.includes("?")
-  ? BASE_API_URL + "&action=getEvents"
-  : BASE_API_URL + "?action=getEvents";
-
 let map;
 
 // ---- ON LOAD ----
@@ -54,7 +50,7 @@ function init() {
 
 // ---- FETCH + RENDER ----
 async function fetchAndRenderEvents(includePast = false) {
-  console.log("Fetching events from:", EVENTS_API_URL);
+  console.log("Fetching events…", EVENTS_API_URL);
   try {
     const res = await fetch(EVENTS_API_URL);
     const data = await res.json();
@@ -63,56 +59,42 @@ async function fetchAndRenderEvents(includePast = false) {
     window.lastEventsResponse = data;
     console.log("Raw API response:", JSON.stringify(data, null, 2));
 
+    // Adapt to any response shape
+    const allEvents =
+      data?.events?.allEvents ||
+      data?.allEvents ||
+      data?.events ||
+      [];
+
     if (!data.success) {
       console.warn("API did not return success:true", data);
-
-      // Auto-retry if we got "Unknown action"
-      if (data.error && data.error.includes("Unknown action")) {
-        console.log("Retrying with explicit ?action=getEvents URL...");
-        const retry = await fetch(BASE_API_URL + "?action=getEvents");
-        const retryData = await retry.json();
-        window.lastEventsResponse = retryData;
-        console.log("Retry response:", JSON.stringify(retryData, null, 2));
-        return handleEventsResponse(retryData, includePast);
-      }
-
       renderError(document.getElementById("events-root"), "API Error");
       return;
     }
 
-    handleEventsResponse(data, includePast);
+    if (!Array.isArray(allEvents) || !allEvents.length) {
+      console.warn("No events found.");
+      renderEmptyState(document.getElementById("events-root"));
+      return;
+    }
+
+    const now = new Date();
+    const upcoming = allEvents.filter(ev => {
+      const d = parseDate(ev.date);
+      return d && d >= now;
+    });
+    const past = allEvents.filter(ev => {
+      const d = parseDate(ev.date);
+      return d && d < now;
+    });
+
+    const eventsToShow = includePast ? [...upcoming, ...past] : upcoming;
+
+    renderEvents(document.getElementById("events-root"), eventsToShow);
   } catch (err) {
     console.error("Failed to load events:", err);
     renderError(document.getElementById("events-root"), err.message);
   }
-}
-
-// ---- HANDLER ----
-function handleEventsResponse(data, includePast) {
-  const allEvents =
-    data?.events?.allEvents ||
-    data?.allEvents ||
-    data?.events ||
-    [];
-
-  if (!Array.isArray(allEvents) || !allEvents.length) {
-    console.warn("No events found.");
-    renderEmptyState(document.getElementById("events-root"));
-    return;
-  }
-
-  const now = new Date();
-  const upcoming = allEvents.filter(ev => {
-    const d = parseDate(ev.date);
-    return d && d >= now;
-  });
-  const past = allEvents.filter(ev => {
-    const d = parseDate(ev.date);
-    return d && d < now;
-  });
-
-  const eventsToShow = includePast ? [...upcoming, ...past] : upcoming;
-  renderEvents(document.getElementById("events-root"), eventsToShow);
 }
 
 // ---- HELPERS ----
@@ -138,9 +120,7 @@ function renderEvents(container, events) {
           })
         : "TBD";
 
-      const link = ev.link
-        ? `<a href="${ev.link}" target="_blank" rel="noopener">${ev.title}</a>`
-        : ev.title;
+      const link = ev.link ? `<a href="${ev.link}" target="_blank">${ev.title}</a>` : ev.title;
 
       return `
         <div class="event-card">
