@@ -42,12 +42,12 @@ console.log("LF-EVENTS JS LOADED");
 
   // INITIALIZATION: after load and after hydration safe delay
   window.addEventListener("load", () => {
-  console.log("Window load fired — initialization starts after frame.");
+  console.log("Window load fired — scheduling init after double frame delay.");
   requestAnimationFrame(() => {
-    // one extra frame so React finishes hydration
-    requestAnimationFrame(init);
+    requestAnimationFrame(init);   // two-frame delay lets React finish diff
   });
 });
+
 
   async function init() {
     console.log("Init starting…");
