@@ -111,7 +111,7 @@ function renderEvents(container, events) {
     return renderEmptyState(container);
   }
 
-  // Batch DOM update (avoid layout thrash)
+  // Build all event cards
   const html = events
     .map(ev => {
       const date = new Date(ev.date);
@@ -122,9 +122,14 @@ function renderEvents(container, events) {
       });
       const safeDesc = ev.description ? ev.description.replace(/\n/g, "<br>") : "";
 
+      // Conditional title linking
+      const titleHTML = ev.link
+        ? `<a href="${ev.link}" target="_blank" rel="noopener noreferrer">${ev.title || "Untitled Event"}</a>`
+        : ev.title || "Untitled Event";
+
       return `
         <div class="event-card" data-lat="${ev.lat || ""}" data-lng="${ev.lng || ""}">
-          <h3>${ev.title || "Untitled Event"}</h3>
+          <h3 class="event-title">${titleHTML}</h3>
           <p class="event-date">${dateStr}</p>
           <p class="event-location">${ev.location || ""}</p>
           <p class="event-description">${safeDesc}</p>
@@ -137,12 +142,11 @@ function renderEvents(container, events) {
 
   // ---- MAP UPDATE ----
   if (map) {
-    // Clear existing markers efficiently
+    // Clear existing markers
     map.eachLayer(layer => {
       if (layer instanceof L.Marker) map.removeLayer(layer);
     });
 
-    // Add new markers
     const markers = [];
 
     events.forEach(ev => {
@@ -154,14 +158,13 @@ function renderEvents(container, events) {
       }
     });
 
-    // Fit map bounds to visible markers (only once)
+    // Fit to all markers
     if (markers.length) {
       const group = new L.featureGroup(markers);
       map.fitBounds(group.getBounds(), { padding: [30, 30] });
     }
 
     // ---- INTERACTION SYNC ----
-    // Hovering an event card highlights its marker
     const cards = container.querySelectorAll(".event-card");
     cards.forEach(card => {
       const lat = parseFloat(card.dataset.lat);
@@ -185,6 +188,7 @@ function renderEvents(container, events) {
 
   console.log(`Rendered ${events.length} events.`);
 }
+
 
 function renderEmptyState(container) {
   container.innerHTML = `
