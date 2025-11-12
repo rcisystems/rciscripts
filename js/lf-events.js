@@ -158,3 +158,46 @@ function renderEvents(container, events) {
 
   console.log(`Rendered ${events.length} events.`);
 }
+
+function initMap() {
+  const mapElement = document.getElementById("eventsMap");
+  if (!mapElement) return;
+
+  map = L.map(mapElement).setView([32.83, -95.58], 10);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
+    maxZoom: 18,
+  }).addTo(map);
+
+  console.log("Map initialized.");
+
+  // 🧩 Force redraw after delay to ensure tiles fully render
+  setTimeout(() => {
+    map.invalidateSize();
+  }, 500);
+
+  // 🧩 Also re-render when window resizes or GoHighLevel adjusts layout
+  window.addEventListener("resize", () => map.invalidateSize());
+}
+
+// === OBSERVE LAYOUT CHANGES TO FIX MISSING MAP TILES ===
+const observer = new MutationObserver(() => {
+  if (map && map._loaded) {
+    map.invalidateSize();
+  }
+});
+
+// Observe DOM changes so if GoHighLevel or container reflows, Leaflet recalculates tiles
+observer.observe(document.body, {
+  attributes: true,
+  childList: true,
+  subtree: true
+});
+
+// Also handle tab visibility or delayed layout rendering
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && map) {
+    map.invalidateSize();
+  }
+});
