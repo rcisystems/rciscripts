@@ -1,270 +1,293 @@
-/****************************************************
- * Lake Fork Events - Frontend Integration Bundle
- * Fully rewritten, stable, hydration-safe
- * Features:
- * - Debounced search (200ms)
- * - Skeleton loaders with fade-out animation
- * - Safe Leaflet map initialization
- * - Resilient fetching with retries
- * - Clean filter system + pagination
- ****************************************************/
-
+// =======================================================
+// Lake Fork Events — Front-end logic (optimized, readable)
+// =======================================================
 console.log("LF-EVENTS JS LOADED");
 
-document.addEventListener("DOMContentLoaded", () => {
-  console.log("Before DOMContentLoaded hook");
+(function () {
+  const API_URL = window.LAKE_FORK_API_URL ||
+    "https://script.google.com/macros/s/AKfycbxiOi_KwTuf30pvE6vy4J6hWN1AUKNpxYpyQOkHymjCD7RlxVC4MFxtTe4bos8jVeyQ/exec";
 
-  /* DOM REFS */
   const refs = {
-    searchInput: document.getElementById("search"),
-    locationFilter: document.getElementById("locationFilter"),
-    dateFilter: document.getElementById("dateFilter"),
-    timeToggle: document.getElementById("timeToggle"),
-    showPast: document.getElementById("showPast"),
-    eventsList: document.getElementById("events-list"),
-    pagination: document.getElementById("pagination"),
-    mapSpinner: document.getElementById("map-spinner"),
-    mapContainer: document.getElementById("eventsMap"),
+    searchInput: null,
+    locationFilter: null,
+    dateFilter: null,
+    timeToggle: null,
+    showPast: null,
+    eventsList: null,
+    pagination: null,
+    mapSpinner: null,
+    mapContainer: null
   };
 
-  console.log("DOM references assigned:", refs);
-
-  /* GLOBAL STATE */
   let allEvents = [];
   let filteredEvents = [];
-  let map;
-  let markers;
+  let map = null;
+  let markerGroup = null;
+  const EVENTS_PER_PAGE = 8;
+  let currentPage = 1;
 
-  /****************************************************
-   * 1. SAFE INIT
-   ****************************************************/
+  // Debounce helper
+  function debounce(fn, delay = 200) {
+    let timer = null;
+    return function (...args) {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn.apply(this, args), delay);
+    };
+  }
+
+  // Utility to wait next frame
+  function nextFrame() {
+    return new Promise(resolve => requestAnimationFrame(resolve));
+  }
+
+  // INITIALIZATION: after load and after hydration safe delay
   window.addEventListener("load", () => {
-    console.log("Window load fired — React hydration finished.");
-    init();
+    console.log("Window load fired — initialization starts after frame.");
+    requestAnimationFrame(() => {
+      setTimeout(init, 50);
+    });
   });
 
   async function init() {
     console.log("Init starting…");
 
+    assignDomRefs();
     showSkeletonLoaders();
     setupEventListeners();
+
+    // Setup map early – but don’t block initial paint
     setupMap();
 
-    await fetchAndRenderEvents();
+    // Fetch events in background
+    const fetchPromise = fetchEvents();
+    // yield one frame so skeleton appears
+    await nextFrame();
+    await fetchPromise;
+
+    // After events loaded
+    fadeOutSkeleton();
+    refs.mapSpinner.classList.add("fade-out");
+    setTimeout(() => refs.mapSpinner.remove(), 400);
   }
 
-  /****************************************************
-   * 2. EVENT FETCHING
-   ****************************************************/
-  async function fetchAndRenderEvents() {
-    try {
-      const res = await fetch(
-        `${window.LAKE_FORK_API_URL}?action=getEvents`,
-        { method: "GET", redirect: "follow" }
-      );
+  function assignDomRefs() {
+    refs.searchInput     = document.getElementById("search");
+    refs.locationFilter  = document.getElementById("locationFilter");
+    refs.dateFilter      = document.getElementById("dateFilter");
+    refs.timeToggle      = document.getElementById("timeToggle");
+    refs.showPast        = document.getElementById("showPast");
+    refs.eventsList      = document.getElementById("events-list");
+    refs.pagination      = document.getElementById("pagination");
+    refs.mapSpinner      = document.getElementById("map-spinner");
+    refs.mapContainer    = document.getElementById("eventsMap");
 
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error);
+    console.log("DOM references assigned:", refs);
+  }
+
+  async function fetchEvents() {
+    try {
+      const response = await fetch(`${API_URL}?action=getEvents`, {
+        method: "GET",
+        redirect: "follow"
+      });
+      const json = await response.json();
+      if (!json.success) throw new Error(json.error || "Unknown error");
 
       allEvents = json.events || [];
-
       populateLocationFilter();
       applyFilters();
-
-      fadeOutSkeleton();
-      refs.mapSpinner.classList.add("fade-out");
-      setTimeout(() => refs.mapSpinner.remove(), 400);
     } catch (err) {
       console.error("Failed to load events:", err);
       refs.eventsList.innerHTML = "<p>Failed to load events.</p>";
     }
   }
 
-  /****************************************************
-   * 3. FILTER SYSTEM WITH DEBOUNCE
-   ****************************************************/
   function setupEventListeners() {
-    const debounce = (fn, delay = 200) => {
-      let timer;
-      return (...args) => {
-        clearTimeout(timer);
-        timer = setTimeout(() => fn(...args), delay);
-      };
-    };
+    const commonHandler = debounce(() => {
+      currentPage = 1;         // reset to first page on filter change
+      applyFilters();
+    }, 250);
 
-    refs.searchInput.addEventListener("input", debounce(applyFilters));
-    refs.locationFilter.addEventListener("change", applyFilters);
-    refs.dateFilter.addEventListener("change", applyFilters);
-    refs.timeToggle.addEventListener("change", applyFilters);
-    refs.showPast.addEventListener("change", applyFilters);
+    refs.searchInput.addEventListener("input", commonHandler);
+    refs.locationFilter.addEventListener("change", commonHandler);
+    refs.dateFilter.addEventListener("change", commonHandler);
+    refs.timeToggle.addEventListener("change", commonHandler);
+    refs.showPast.addEventListener("change", commonHandler);
   }
 
   function applyFilters() {
-    const term = refs.searchInput.value.toLowerCase();
-    const loc = refs.locationFilter.value;
-    const date = refs.dateFilter.value;
-    const mode = refs.timeToggle.value; // upcoming | past
+    const term       = (refs.searchInput.value || "").toLowerCase();
+    const loc        = refs.locationFilter.value;
+    const date       = refs.dateFilter.value;
+    const mode       = refs.timeToggle.value;   // "upcoming" or "past"
     const includePast = refs.showPast.checked;
 
-    const today = new Date().toISOString().split("T")[0];
+    const today      = new Date().toISOString().split("T")[0];
 
     filteredEvents = allEvents.filter(ev => {
-      let ok = true;
-
-      if (term && !(`${ev.title} ${ev.description}`.toLowerCase().includes(term)))
-        ok = false;
-
-      if (loc && ev.location !== loc)
-        ok = false;
-
-      if (date && ev.date !== date)
-        ok = false;
-
-      if (!includePast && ev.date < today)
-        ok = false;
-
-      if (mode === "upcoming" && ev.date < today)
-        ok = false;
-
-      if (mode === "past" && ev.date >= today)
-        ok = false;
-
-      return ok;
+      if (term && !(`${ev.title} ${ev.description}`.toLowerCase().includes(term))) {
+        return false;
+      }
+      if (loc && ev.location !== loc) {
+        return false;
+      }
+      if (date && ev.date !== date) {
+        return false;
+      }
+      if (!includePast && ev.date < today) {
+        return false;
+      }
+      if (mode === "upcoming" && ev.date < today) {
+        return false;
+      }
+      if (mode === "past" && ev.date >= today) {
+        return false;
+      }
+      return true;
     });
 
-    // Sorting based on your choice (A): chronological upcoming
+    // Sort chronologically
     filteredEvents.sort((a, b) => a.date.localeCompare(b.date));
 
     renderEvents();
-    updateMapMarkers();
+    // Use idle callback for map update to avoid blocking main thread
+    if (window.requestIdleCallback) {
+      requestIdleCallback(updateMapMarkers, { timeout: 500 });
+    } else {
+      updateMapMarkers();
+    }
   }
 
-  /****************************************************
-   * 4. LOCATION FILTER POPULATION
-   ****************************************************/
   function populateLocationFilter() {
-    const unique = [...new Set(allEvents.map(ev => ev.location))].filter(Boolean);
-    unique.forEach(loc => {
-      const opt = document.createElement("option");
-      opt.value = loc;
-      opt.textContent = loc;
-      refs.locationFilter.appendChild(opt);
-    });
+    const uniqueLocs = [...new Set(allEvents.map(ev => ev.location).filter(Boolean))];
+    refs.locationFilter.innerHTML = `<option value="">All Locations</option>` +
+      uniqueLocs.map(loc => `<option value="${loc}">${loc}</option>`).join("");
   }
-
-  /****************************************************
-   * 5. RENDER EVENTS + PAGINATION
-   ****************************************************/
-  const EVENTS_PER_PAGE = 8;
-  let currentPage = 1;
 
   function renderEvents() {
-    refs.eventsList.innerHTML = "";
-    refs.eventsList.classList.remove("hidden");
+    const listEl    = refs.eventsList;
+    const pagEl     = refs.pagination;
+    const startIdx  = (currentPage - 1) * EVENTS_PER_PAGE;
+    const pageSlice = filteredEvents.slice(startIdx, startIdx + EVENTS_PER_PAGE);
 
-    const start = (currentPage - 1) * EVENTS_PER_PAGE;
-    const pageEvents = filteredEvents.slice(start, start + EVENTS_PER_PAGE);
-
-    if (pageEvents.length === 0) {
-      refs.eventsList.innerHTML = "<p>No events found.</p>";
-      refs.pagination.innerHTML = "";
+    // Clear and render
+    if (pageSlice.length === 0) {
+      listEl.innerHTML   = "<p>No events found.</p>";
+      pagEl.innerHTML    = "";
       return;
     }
 
-    pageEvents.forEach(ev => {
+    const frag = document.createDocumentFragment();
+    for (const ev of pageSlice) {
       const item = document.createElement("div");
-      item.className = "event-item fade-in";
+      item.className = "event-item";
       item.innerHTML = `
         <h3>${ev.title}</h3>
         <p><strong>Date:</strong> ${ev.date}</p>
         <p><strong>Location:</strong> ${ev.location}</p>
         <p>${ev.description}</p>
       `;
-      refs.eventsList.appendChild(item);
-    });
+      frag.appendChild(item);
+    }
+
+    // Replace children in one operation
+    listEl.innerHTML = "";
+    listEl.appendChild(frag);
 
     updatePagination();
   }
 
   function updatePagination() {
-    const pages = Math.ceil(filteredEvents.length / EVENTS_PER_PAGE);
-    refs.pagination.innerHTML = "";
+    const totalPages = Math.ceil(filteredEvents.length / EVENTS_PER_PAGE);
+    const pagEl      = refs.pagination;
+    pagEl.innerHTML  = "";
 
-    if (pages <= 1) return;
+    if (totalPages <= 1) {
+      return;
+    }
 
-    for (let p = 1; p <= pages; p++) {
+    const frag = document.createDocumentFragment();
+    for (let p = 1; p <= totalPages; p++) {
       const btn = document.createElement("button");
       btn.textContent = p;
-      btn.className = p === currentPage ? "active" : "";
+      btn.className = (p === currentPage) ? "active" : "";
       btn.addEventListener("click", () => {
+        if (p === currentPage) return;
         currentPage = p;
         renderEvents();
         updateMapMarkers();
       });
-      refs.pagination.appendChild(btn);
+      frag.appendChild(btn);
     }
+    pagEl.appendChild(frag);
   }
 
-  /****************************************************
-   * 6. MAP SETUP (SAFE LEAFLET INIT)
-   ****************************************************/
   function setupMap() {
-    if (!refs.mapContainer) {
+    const container = refs.mapContainer;
+    if (!container) {
       console.error("Map container not found.");
       return;
     }
 
-    map = L.map(refs.mapContainer).setView([32.8, -95.5], 10);
-
+    // Lazy-initialize map on first view if desired
+    map = L.map(container).setView([32.8, -95.5], 10);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "&copy; OpenStreetMap",
+      attribution: "&copy; OpenStreetMap"
     }).addTo(map);
 
-    markers = L.markerClusterGroup();
-    map.addLayer(markers);
+    markerGroup = L.markerClusterGroup();
+    map.addLayer(markerGroup);
 
     console.log("Map initialized.");
   }
 
   function updateMapMarkers() {
-    if (!markers) return;
+    if (!map || !markerGroup) return;
 
-    markers.clearLayers();
+    markerGroup.clearLayers();
 
-    filteredEvents.forEach(ev => {
-      if (ev.lat && ev.lng) {
+    for (const ev of filteredEvents) {
+      if (ev.lat != null && ev.lng != null) {
         const marker = L.marker([ev.lat, ev.lng]).bindPopup(`
           <strong>${ev.title}</strong><br>
           ${ev.date}<br>
           ${ev.location}
         `);
-        markers.addLayer(marker);
+        markerGroup.addLayer(marker);
       }
-    });
+    }
+
+    // Optionally: adjust map bounds to current markers
+    const layerBounds = markerGroup.getBounds();
+    if (layerBounds.isValid()) {
+      map.fitBounds(layerBounds, { maxZoom: 14, padding: [40, 40] });
+    }
   }
 
-  /****************************************************
-   * 7. SKELETON LOADING
-   ****************************************************/
   function showSkeletonLoaders() {
-    let skeletonHTML = "";
+    const listEl = refs.eventsList;
+    let html = "";
     for (let i = 0; i < 6; i++) {
-      skeletonHTML += `
-        <div class="event-skeleton">
-          <div class="sk-title"></div>
-          <div class="sk-line"></div>
-          <div class="sk-line short"></div>
+      html += `
+        <div class="skeleton-card">
+          <div class="skeleton-line skeleton-long"></div>
+          <div class="skeleton-line skeleton-medium"></div>
+          <div class="skeleton-line skeleton-short"></div>
         </div>
       `;
     }
-    refs.eventsList.innerHTML = skeletonHTML;
-    refs.eventsList.classList.remove("hidden");
+    listEl.innerHTML = html;
+    listEl.classList.remove("hidden");
   }
 
   function fadeOutSkeleton() {
-    document.querySelectorAll(".event-skeleton").forEach(el => {
+    const skeletons = refs.eventsList.querySelectorAll(".skeleton-card");
+    skeletons.forEach(el => {
       el.classList.add("fade-out");
-      setTimeout(() => el.remove(), 400);
+      setTimeout(() => {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      }, 400);
     });
   }
-});
+
+})();
