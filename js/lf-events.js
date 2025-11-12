@@ -106,11 +106,13 @@ function renderEvents(container, events) {
     console.error("No container to render events into.");
     return;
   }
+
   if (!events || !events.length) {
     return renderEmptyState(container);
   }
 
-  container.innerHTML = events
+  // Batch DOM update (avoid layout thrash)
+  const html = events
     .map(ev => {
       const date = new Date(ev.date);
       const dateStr = date.toLocaleDateString(undefined, {
@@ -118,28 +120,65 @@ function renderEvents(container, events) {
         day: "numeric",
         year: "numeric",
       });
+      const safeDesc = ev.description ? ev.description.replace(/\n/g, "<br>") : "";
+
       return `
-        <div class="event-card">
+        <div class="event-card" data-lat="${ev.lat || ""}" data-lng="${ev.lng || ""}">
           <h3>${ev.title || "Untitled Event"}</h3>
           <p class="event-date">${dateStr}</p>
           <p class="event-location">${ev.location || ""}</p>
-          <p class="event-description">${ev.description || ""}</p>
+          <p class="event-description">${safeDesc}</p>
         </div>
       `;
     })
     .join("");
 
-  // Update map markers
-  if (map && events.length) {
+  container.innerHTML = html;
+
+  // ---- MAP UPDATE ----
+  if (map) {
+    // Clear existing markers efficiently
     map.eachLayer(layer => {
       if (layer instanceof L.Marker) map.removeLayer(layer);
     });
 
+    // Add new markers
+    const markers = [];
+
     events.forEach(ev => {
       if (ev.lat && ev.lng) {
-        L.marker([ev.lat, ev.lng])
+        const marker = L.marker([ev.lat, ev.lng])
           .addTo(map)
-          .bindPopup(`<b>${ev.title}</b><br>${ev.location}`);
+          .bindPopup(`<b>${ev.title}</b><br>${ev.location || ""}`);
+        markers.push(marker);
+      }
+    });
+
+    // Fit map bounds to visible markers (only once)
+    if (markers.length) {
+      const group = new L.featureGroup(markers);
+      map.fitBounds(group.getBounds(), { padding: [30, 30] });
+    }
+
+    // ---- INTERACTION SYNC ----
+    // Hovering an event card highlights its marker
+    const cards = container.querySelectorAll(".event-card");
+    cards.forEach(card => {
+      const lat = parseFloat(card.dataset.lat);
+      const lng = parseFloat(card.dataset.lng);
+
+      if (!isNaN(lat) && !isNaN(lng)) {
+        card.addEventListener("mouseenter", () => {
+          const marker = markers.find(m => {
+            const pos = m.getLatLng();
+            return pos.lat === lat && pos.lng === lng;
+          });
+          if (marker) marker.openPopup();
+        });
+
+        card.addEventListener("mouseleave", () => {
+          map.closePopup();
+        });
       }
     });
   }
