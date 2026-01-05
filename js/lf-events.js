@@ -84,19 +84,42 @@ async function fetchAndRenderEvents(dom) {
   }
 }
 
+function getDirectLogoUrl(url) {
+  if (!url) return "";
+  // Check if it's a Google Drive "sharing" link
+  if (url.includes("drive.google.com")) {
+    const fileId = url.split("id=")[1] || url.split("/d/")[1]?.split("/")[0];
+    return `https://lh3.googleusercontent.com/u/0/d/${fileId}`;
+  }
+  return url;
+}
+
+// Then in your renderEvents map function, update the logo HTML line:
+const logoUrl = getDirectLogoUrl(ev.logo);
+const logoHTML = logoUrl ? `<img src="${logoUrl}" alt="${ev.title}" class="event-logo" />` : "";
+
 // === FILTER & SEARCH ===
 function renderFiltered(dom) {
   const showPast = dom.showPast?.checked;
   const searchTerm = dom.searchInput?.value?.toLowerCase() || "";
+  
+  // Set 'now' to the very start of today so current events don't disappear
   const now = new Date();
+  now.setHours(0, 0, 0, 0);
 
   const filtered = allEvents.filter(ev => {
-    const isPast = new Date(ev.endDate) < now;
+    // Ensure we handle potentially null dates gracefully
+    const eventEndDate = ev.endDate ? new Date(ev.endDate) : new Date(ev.startDate);
+    const isPast = eventEndDate < now;
+    
     const matchesPast = showPast || !isPast;
+    
     const matchesSearch =
       ev.title?.toLowerCase().includes(searchTerm) ||
       ev.description?.toLowerCase().includes(searchTerm) ||
-      ev.location?.toLowerCase().includes(searchTerm);
+      ev.location?.toLowerCase().includes(searchTerm) ||
+      ev.startDate?.toLowerCase().includes(searchTerm); // Search by date string
+
     return matchesPast && matchesSearch;
   });
 
@@ -131,7 +154,11 @@ function renderEvents(container, events) {
         : ev.title;
 
       const logoHTML = ev.logo
-        ? `<img src="${ev.logo}" alt="${ev.title}" class="event-logo" loading="lazy" />`
+        ? `<img src="${ev.logo.replace('open?id=', 'uc?export=view&id=')}" 
+                alt="${ev.title}" 
+                class="event-logo" 
+                onerror="this.style.display='none'" 
+                loading="lazy" />`
         : "";
 
       return `
@@ -191,3 +218,4 @@ observer.observe(document.body, { attributes: true, childList: true, subtree: tr
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && map) map.invalidateSize();
 });
+
